@@ -42,7 +42,7 @@ def send_command_loop():
     while True:
         command = commands[i % len(commands)]
         client.publish(TOPIC_PUB, command)
-        print(f"📤 Published command: {command}")
+        print(f"Published command: {command}")
         i += 1
         time.sleep(5)
 
