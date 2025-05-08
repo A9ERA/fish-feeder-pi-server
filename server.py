@@ -8,7 +8,7 @@ import time
 MQTT_BROKER = "localhost"
 MQTT_PORT = 1883
 TOPIC_SUB = "sensor/data"
-TOPIC_PUB = "server/message"
+TOPIC_PUB = "esp32/control"
 
 FIREBASE_URL = "https://addsensorvalue-bp4gxqhmza-uc.a.run.app"
 
