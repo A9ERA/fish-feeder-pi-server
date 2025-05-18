@@ -5,7 +5,6 @@ import paho.mqtt.client as mqtt
 import json
 import datetime
 from src.config.settings import MQTT_BROKER, MQTT_PORT, TOPIC_SUB
-from src.services.firebase_service import FirebaseService
 from src.services.sensor_data_service import SensorDataService
 
 class MQTTService:
@@ -13,7 +12,6 @@ class MQTTService:
         self.client = mqtt.Client()
         self.client.on_connect = self.on_connect
         self.client.on_message = self.on_message
-        self.firebase_service = FirebaseService()
         self.sensor_data_service = SensorDataService()
 
     def on_connect(self, client, userdata, flags, rc):
@@ -48,11 +46,6 @@ class MQTTService:
             # Update sensor data using the sensor data service
             sensor_name = data_dict['name']
             self.sensor_data_service.update_sensor_data(sensor_name, data_dict['value'])
-
-            # Commented out Firebase integration for now
-            # for key, value in data_dict.items():
-            #     status_code, response_text = self.firebase_service.send_sensor_data(key, value)
-            #     print(f"Sent {key}: {value} → {status_code}, {response_text}")
 
         except Exception as e:
             print(f"MQTT Error: {e}")
