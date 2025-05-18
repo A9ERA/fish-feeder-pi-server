@@ -1,8 +1,8 @@
 """
-Flask API service for handling sensor data requests
+Flask API service for handling sensor data requests and camera operations
 """
 import json5  # Add json5 for JSONC support
-from flask import Flask, jsonify, Response, render_template
+from flask import Flask, jsonify, Response, render_template, request
 from pathlib import Path
 import time
 from .video_stream_service import VideoStreamService
@@ -10,7 +10,8 @@ from .video_stream_service import VideoStreamService
 class APIService:
     def __init__(self, host='0.0.0.0', port=5000):
         self.app = Flask(__name__, 
-                        template_folder=Path(__file__).parent.parent / 'templates')
+                        template_folder=Path(__file__).parent.parent / 'templates',
+                        static_folder=Path(__file__).parent.parent.parent / 'static')
         self.host = host
         self.port = port
         self.sensors_file = Path(__file__).parent.parent / 'data' / 'sensors_data.jsonc'
@@ -22,7 +23,13 @@ class APIService:
         self.app.route('/api/sensors')(self.get_all_sensors)
         self.app.route('/health')(self.health_check)
         self.app.route('/video_feed')(self.video_feed)
-        self.app.route('/')(self.index)  # Add route for the main page
+        self.app.route('/')(self.index)
+        
+        # Camera control routes
+        self.app.route('/api/camera/photo', methods=['POST'])(self.take_photo)
+        self.app.route('/api/camera/record/start', methods=['POST'])(self.start_recording)
+        self.app.route('/api/camera/record/stop', methods=['POST'])(self.stop_recording)
+        self.app.route('/api/camera/audio/record', methods=['POST'])(self.record_audio)
 
     def index(self):
         """Render the main video streaming page"""
@@ -31,6 +38,66 @@ class APIService:
     def video_feed(self):
         """Video streaming endpoint"""
         return self.video_service.get_video_feed()
+
+    def take_photo(self):
+        """Take a photo and return the file path"""
+        try:
+            file_path = self.video_service.take_photo()
+            return jsonify({
+                'status': 'success',
+                'message': 'Photo captured successfully',
+                'file_path': file_path
+            })
+        except Exception as e:
+            return jsonify({
+                'status': 'error',
+                'message': f'Failed to capture photo: {str(e)}'
+            }), 500
+
+    def start_recording(self):
+        """Start video recording"""
+        try:
+            file_path = self.video_service.start_recording()
+            return jsonify({
+                'status': 'success',
+                'message': 'Recording started',
+                'file_path': file_path
+            })
+        except Exception as e:
+            return jsonify({
+                'status': 'error',
+                'message': f'Failed to start recording: {str(e)}'
+            }), 500
+
+    def stop_recording(self):
+        """Stop video recording"""
+        try:
+            self.video_service.stop_recording()
+            return jsonify({
+                'status': 'success',
+                'message': 'Recording stopped'
+            })
+        except Exception as e:
+            return jsonify({
+                'status': 'error',
+                'message': f'Failed to stop recording: {str(e)}'
+            }), 500
+
+    def record_audio(self):
+        """Start audio recording"""
+        try:
+            duration = request.json.get('duration', 30) if request.is_json else 30
+            file_path = self.video_service.record_audio(duration)
+            return jsonify({
+                'status': 'success',
+                'message': f'Audio recording started for {duration} seconds',
+                'file_path': file_path
+            })
+        except Exception as e:
+            return jsonify({
+                'status': 'error',
+                'message': f'Failed to start audio recording: {str(e)}'
+            }), 500
 
     def health_check(self):
         """Health check endpoint that returns API status and uptime"""
