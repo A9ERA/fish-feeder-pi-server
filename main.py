@@ -17,8 +17,8 @@ def main():
     mqtt_service.connect()
 
     # Initialize and start command service
-    command_service = CommandService(mqtt_service)
-    command_service.start()
+    # command_service = CommandService(mqtt_service)
+    # command_service.start()
 
     # Initialize and start API service in a separate thread
     api_service = APIService()
