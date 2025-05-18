@@ -5,8 +5,6 @@ import json5  # Add json5 for JSONC support
 from flask import Flask, jsonify
 from pathlib import Path
 import time
-import subprocess
-import threading
 
 class APIService:
     def __init__(self, host='0.0.0.0', port=5000):
@@ -20,16 +18,6 @@ class APIService:
         self.app.route('/api/sensors/<sensor_name>')(self.get_sensor_data)
         self.app.route('/api/sensors')(self.get_all_sensors)
         self.app.route('/health')(self.health_check)
-
-    def _start_ngrok(self):
-        """Start ngrok tunnel in a separate process"""
-        try:
-            subprocess.run(['ngrok', 'http', '--url=capable-civet-honestly.ngrok-free.app', '5000'], 
-                         check=True)
-        except subprocess.CalledProcessError as e:
-            print(f"Error starting ngrok: {e}")
-        except FileNotFoundError:
-            print("Error: ngrok command not found. Please make sure ngrok is installed and in your PATH")
 
     def health_check(self):
         """Health check endpoint that returns API status and uptime"""
@@ -94,10 +82,7 @@ class APIService:
             }), 500
 
     def start(self):
-        """Start the Flask server and ngrok tunnel"""
-        # Start ngrok in a separate thread
-        ngrok_thread = threading.Thread(target=self._start_ngrok, daemon=True)
-        ngrok_thread.start()
+        """Start the Flask server"""
         
         # Start Flask server
         self.app.run(host=self.host, port=self.port) 
