@@ -22,6 +22,7 @@ class StreamingOutput(io.BufferedIOBase):
     def write(self, buf):
         with self.condition:
             self.frame = buf
+            print("Frame written to stream output.")
             self.condition.notify_all()
 
 class VideoStreamService:
@@ -55,17 +56,23 @@ class VideoStreamService:
         
         # Start camera
         self.picam2.start_encoder(self.encoder)
+        print("Encoder started.")
         self.picam2.start_recording(self.video_encoder, self.video_output)
+        print("Recording started.")
 
     def generate_frames(self):
         """Generate camera frames for streaming"""
         while True:
             try:
                 with self.stream_out.condition:
-                    self.stream_out.condition.wait()
+                    self.stream_out.condition.wait(timeout=2)
                     frame = self.stream_out.frame
-                yield (b'--frame\r\n'
-                       b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+                if frame is not None:
+                    print("Sending frame...")
+                    yield (b'--frame\r\n'
+                           b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+                else:
+                    print("No frame available.")
             except Exception as e:
                 print(f"Error capturing frame: {e}")
                 break
