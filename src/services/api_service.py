@@ -1,7 +1,7 @@
 """
 Flask API service for handling sensor data requests
 """
-import json
+import json5  # Add json5 for JSONC support
 from flask import Flask, jsonify
 from pathlib import Path
 import time
@@ -36,7 +36,7 @@ class APIService:
         try:
             # Try to read the sensors file as a basic health check
             with open(self.sensors_file, 'r') as f:
-                json.load(f)  # Verify we can parse the JSON
+                json5.loads(f.read())  # Use json5 instead of json for JSONC support
                 
             uptime_seconds = int(time.time() - self.start_time)
             hours, remainder = divmod(uptime_seconds, 3600)
@@ -60,7 +60,7 @@ class APIService:
         """Get data for a specific sensor by name"""
         try:
             with open(self.sensors_file, 'r') as f:
-                data = json.load(f)
+                data = json5.loads(f.read())  # Use json5 instead of json for JSONC support
                 
             if sensor_name not in data['sensors']:
                 return jsonify({
@@ -78,7 +78,7 @@ class APIService:
         """Get list of all available sensors"""
         try:
             with open(self.sensors_file, 'r') as f:
-                data = json.load(f)
+                data = json5.loads(f.read())  # Use json5 instead of json for JSONC support
                 
             # Return just the sensor names and descriptions
             sensors = {
