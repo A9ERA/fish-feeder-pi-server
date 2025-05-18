@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🎥 Raspberry Pi Live Stream</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h2 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .video-container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        img {
+            display: block;
+            margin: 0 auto;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h2>🔴 Live Video Feed</h2>
+    <div class="video-container">
+        <img src="{{ url_for('video_feed') }}" width="640" height="480" alt="Live Video Stream">
+    </div>
+</body>
+</html> 

@@ -2,14 +2,15 @@
 Flask API service for handling sensor data requests
 """
 import json5  # Add json5 for JSONC support
-from flask import Flask, jsonify, Response
+from flask import Flask, jsonify, Response, render_template
 from pathlib import Path
 import time
 from .video_stream_service import VideoStreamService
 
 class APIService:
     def __init__(self, host='0.0.0.0', port=5000):
-        self.app = Flask(__name__)
+        self.app = Flask(__name__, 
+                        template_folder=Path(__file__).parent.parent / 'templates')
         self.host = host
         self.port = port
         self.sensors_file = Path(__file__).parent.parent / 'data' / 'sensors_data.jsonc'
@@ -21,6 +22,11 @@ class APIService:
         self.app.route('/api/sensors')(self.get_all_sensors)
         self.app.route('/health')(self.health_check)
         self.app.route('/video_feed')(self.video_feed)
+        self.app.route('/')(self.index)  # Add route for the main page
+
+    def index(self):
+        """Render the main video streaming page"""
+        return render_template('index.html')
 
     def video_feed(self):
         """Video streaming endpoint"""
