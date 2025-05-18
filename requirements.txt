@@ -4,3 +4,4 @@ flask==3.0.2
 json5==0.9.14
 numpy==1.26.4
 opencv-python==4.8.1.78
+picamera2==0.2.12
