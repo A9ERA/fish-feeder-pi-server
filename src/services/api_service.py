@@ -2,9 +2,10 @@
 Flask API service for handling sensor data requests
 """
 import json5  # Add json5 for JSONC support
-from flask import Flask, jsonify
+from flask import Flask, jsonify, Response
 from pathlib import Path
 import time
+from .video_stream_service import VideoStreamService
 
 class APIService:
     def __init__(self, host='0.0.0.0', port=5000):
@@ -13,11 +14,17 @@ class APIService:
         self.port = port
         self.sensors_file = Path(__file__).parent.parent / 'data' / 'sensors_data.jsonc'
         self.start_time = time.time()
+        self.video_service = VideoStreamService()  # Initialize video service
         
         # Register routes
         self.app.route('/api/sensors/<sensor_name>')(self.get_sensor_data)
         self.app.route('/api/sensors')(self.get_all_sensors)
         self.app.route('/health')(self.health_check)
+        self.app.route('/video_feed')(self.video_feed)
+
+    def video_feed(self):
+        """Video streaming endpoint"""
+        return self.video_service.get_video_feed()
 
     def health_check(self):
         """Health check endpoint that returns API status and uptime"""
@@ -83,6 +90,10 @@ class APIService:
 
     def start(self):
         """Start the Flask server"""
-        
-        # Start Flask server
-        self.app.run(host=self.host, port=self.port) 
+        try:
+            # Start Flask server
+            self.app.run(host=self.host, port=self.port)
+        finally:
+            # Release video service resources
+            if hasattr(self, 'video_service'):
+                self.video_service.release() 
