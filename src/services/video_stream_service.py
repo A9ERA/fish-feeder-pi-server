@@ -22,7 +22,6 @@ class StreamingOutput(io.BufferedIOBase):
     def write(self, buf):
         with self.condition:
             self.frame = buf
-            print("Frame written to stream output.")
             self.condition.notify_all()
 
 class VideoStreamService:
@@ -68,7 +67,6 @@ class VideoStreamService:
                     self.stream_out.condition.wait(timeout=2)
                     frame = self.stream_out.frame
                 if frame is not None:
-                    print("Sending frame...")
                     yield (b'--frame\r\n'
                            b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
                 else:
