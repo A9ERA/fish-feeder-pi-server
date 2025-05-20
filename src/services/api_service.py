@@ -3,6 +3,7 @@ Flask API service for handling sensor data requests and camera operations
 """
 import json5  # Add json5 for JSONC support
 from flask import Flask, jsonify, Response, render_template, request
+from flask_cors import CORS
 from pathlib import Path
 import time
 from .video_stream_service import VideoStreamService
@@ -12,6 +13,8 @@ class APIService:
         self.app = Flask(__name__, 
                         template_folder=Path(__file__).parent.parent / 'templates',
                         static_folder=Path(__file__).parent.parent.parent / 'static')
+        # Enable CORS for all routes
+        CORS(self.app)
         self.host = host
         self.port = port
         self.sensors_file = Path(__file__).parent.parent / 'data' / 'sensors_data.jsonc'

@@ -1,6 +1,7 @@
 paho-mqtt==1.6.1
 requests==2.31.0
 flask==3.0.2
+flask-cors==4.0.0
 json5==0.9.14
 numpy==1.26.4
 opencv-python==4.8.1.78
