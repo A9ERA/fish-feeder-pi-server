@@ -61,24 +61,49 @@ class VideoStreamService:
 
     def generate_frames(self):
         """Generate camera frames for streaming"""
-        while True:
-            try:
-                with self.stream_out.condition:
-                    self.stream_out.condition.wait(timeout=2)
-                    frame = self.stream_out.frame
-                if frame is not None:
-                    yield (b'--frame\r\n'
-                           b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
-                else:
-                    print("No frame available.")
-            except Exception as e:
-                print(f"Error capturing frame: {e}")
-                break
+        try:
+            while True:
+                try:
+                    with self.stream_out.condition:
+                        # Reduced timeout to make stream more responsive
+                        self.stream_out.condition.wait(timeout=1)
+                        frame = self.stream_out.frame
+                    
+                    if frame is not None:
+                        yield (b'--frame\r\n'
+                               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+                    else:
+                        # If no frame, send an empty frame to keep connection alive
+                        yield (b'--frame\r\n'
+                               b'Content-Type: image/jpeg\r\n\r\n\r\n')
+                        time.sleep(0.1)  # Small delay to prevent CPU overload
+                        
+                except Exception as e:
+                    print(f"Frame capture error: {e}")
+                    # Don't break on single frame error, try to continue
+                    time.sleep(0.5)
+                    continue
+                    
+        except GeneratorExit:
+            # Clean handling of client disconnection
+            print("Client disconnected from stream")
+        except Exception as e:
+            print(f"Fatal streaming error: {e}")
+        finally:
+            # Ensure resources are properly managed
+            print("Stream ended")
 
     def get_video_feed(self):
         """Get video feed response"""
-        return Response(self.generate_frames(),
-                       mimetype='multipart/x-mixed-replace; boundary=frame')
+        return Response(
+            self.generate_frames(),
+            mimetype='multipart/x-mixed-replace; boundary=frame',
+            headers={
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0'
+            }
+        )
 
     def take_photo(self):
         """Take a photo and save it"""
