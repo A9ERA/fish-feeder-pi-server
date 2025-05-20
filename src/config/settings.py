@@ -13,6 +13,6 @@ COMMAND_INTERVAL = 5  # seconds
 COMMANDS = ["on_in1", "on_in2", "off_all"]
 
 # Application Configuration
-APP_NAME = "Pi MQTT Server"
+APP_NAME = "FISH FEEDER - Pi MQTT/API Server"
 DEBUG = False
 LOG_LEVEL = "INFO" 
