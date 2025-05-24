@@ -31,11 +31,15 @@ class VideoStreamService:
         self.picam2 = Picamera2()
         
         # Configure video streaming
-        self.picam2.configure(self.picam2.create_video_configuration(main={"size": (500, 500), "framerate": 30}))
+        video_config = self.picam2.create_video_configuration(
+            main={"size": (500, 500)},
+            controls={"FrameRate": 30.0}
+        )
+        self.picam2.configure(video_config)
         self.still_config = self.picam2.create_still_configuration()
         
         # Setup streaming
-        self.encoder = MJPEGEncoder(10000000)
+        self.encoder = MJPEGEncoder(bitrate=10000000, framerate=30)
         self.stream_out = StreamingOutput()
         self.stream_out2 = FileOutput(self.stream_out)
         self.encoder.output = [self.stream_out2]
