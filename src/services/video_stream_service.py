@@ -39,7 +39,7 @@ class VideoStreamService:
         self.still_config = self.picam2.create_still_configuration()
         
         # Setup streaming
-        self.encoder = MJPEGEncoder(bitrate=10000000, framerate=30)
+        self.encoder = MJPEGEncoder(bitrate=10000000)
         self.stream_out = StreamingOutput()
         self.stream_out2 = FileOutput(self.stream_out)
         self.encoder.output = [self.stream_out2]
