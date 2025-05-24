@@ -31,7 +31,7 @@ class VideoStreamService:
         self.picam2 = Picamera2()
         
         # Configure video streaming
-        self.picam2.configure(self.picam2.create_video_configuration(main={"size": (800, 600)}))
+        self.picam2.configure(self.picam2.create_video_configuration(main={"size": (500, 500), "framerate": 30}))
         self.still_config = self.picam2.create_still_configuration()
         
         # Setup streaming
