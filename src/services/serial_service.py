@@ -68,7 +68,7 @@ class SerialService:
         Process received data and update sensor data service
         
         Expected format from Arduino:
-        {
+        [SEND] - {
             "name": "DHT22_FEEDER",
             "value": [
                 {
@@ -85,10 +85,13 @@ class SerialService:
         }
         """
         try:
-            print(f"Processing data: {data}")
-            # data_dict = json.loads(data)
-            # sensor_name = data_dict['name']
-            # self.sensor_data_service.update_sensor_data(sensor_name, data_dict['value'])
+            if data.startswith("[SEND] - "):
+                # Remove the "[SEND] - " prefix
+                json_data = data[8:]
+                data_dict = json.loads(json_data)
+                sensor_name = data_dict['name']
+                print(f"[⌗][Serial Service] - Processing data from sensor: {sensor_name}")
+                self.sensor_data_service.update_sensor_data(sensor_name, data_dict['value'])
         except json.JSONDecodeError:
             print(f"Invalid JSON data received: {data}")
         except Exception as e:
