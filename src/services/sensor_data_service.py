@@ -1,7 +1,7 @@
 """
 Service for managing sensor data storage and retrieval
 """
-import json
+import json5  # Use json5 for JSONC support
 import datetime
 from typing import Dict, Any
 from pathlib import Path
@@ -19,13 +19,13 @@ class SensorDataService:
             
             # Create initial data structure
             initial_data = {
-                "last_updated": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "last_updated": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),  # last updated timestamp of all sensors
                 "sensors": {}
             }
             
             # Save initial data
             with open(self.data_file_path, 'w') as f:
-                json.dump(initial_data, f, indent=4)
+                json5.dump(initial_data, f, indent=4, quote_keys=True)
 
     def update_sensor_data(self, sensor_name: str, sensor_values: list) -> None:
         """
@@ -41,7 +41,7 @@ class SensorDataService:
             
             # Load existing data
             with open(self.data_file_path, 'r') as f:
-                sensors_data = json.loads(f.read())
+                sensors_data = json5.loads(f.read())
 
             # Update sensor data
             current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -60,7 +60,7 @@ class SensorDataService:
 
             # Save updated data
             with open(self.data_file_path, 'w') as f:
-                json.dump(sensors_data, f, indent=4)
+                json5.dump(sensors_data, f, indent=4, quote_keys=True)
                 
             print(f"[⌗][Sensor Data Service] - Updated data for sensor: {sensor_name}")
 
@@ -79,7 +79,7 @@ class SensorDataService:
             self._ensure_data_file_exists()
             
             with open(self.data_file_path, 'r') as f:
-                return json.loads(f.read())
+                return json5.loads(f.read())
         except Exception as e:
             print(f"[❌][Sensor Data Service] Error: {e}")
             return {"error": str(e)} 
