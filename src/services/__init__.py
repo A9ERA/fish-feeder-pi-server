@@ -1,3 +1,3 @@
 """
-Services package containing MQTT, Firebase, and Command services
+Services package containing Serial and API services
 """ 

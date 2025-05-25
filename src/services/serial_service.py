@@ -6,15 +6,16 @@ import json
 import threading
 from typing import Optional
 from src.services.sensor_data_service import SensorDataService
+from src.config.settings import SERIAL_PORT, BAUD_RATE
 
 class SerialService:
-    def __init__(self, port: str = '/dev/ttyUSB0', baud_rate: int = 9600):
+    def __init__(self, port: str = SERIAL_PORT, baud_rate: int = BAUD_RATE):
         """
         Initialize Serial Service
         
         Args:
-            port: Serial port (default: /dev/ttyUSB0)
-            baud_rate: Baud rate for serial communication (default: 9600)
+            port: Serial port (default from settings)
+            baud_rate: Baud rate for serial communication (default from settings)
         """
         self.port = port
         self.baud_rate = baud_rate
