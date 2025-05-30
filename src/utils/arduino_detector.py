@@ -32,7 +32,7 @@ def find_arduino_port() -> Optional[str]:
     print("❌ No Arduino device found")
     return None
 
-def list_all_ports() -> List[serial.tools.list_ports.ListPortInfo]:
+def list_all_ports() -> List:
     """
     List all available serial ports
     
