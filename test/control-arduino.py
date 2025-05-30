@@ -5,8 +5,14 @@ Tests the device control functionality matching the controlSensor() function
 """
 
 import serial
+import serial.tools.list_ports
 import time
 import sys
+import os
+
+# Add the src directory to the path so we can import our utils
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
+from utils.arduino_detector import find_arduino_port, list_all_ports
 
 def send_command(ser, command):
     """Send a command and display the result"""
@@ -79,19 +85,32 @@ def test_invalid_commands(ser):
 
 def main():
     # Configuration
-    SERIAL_PORT = '/dev/ttyUSB0'  # Change this to match your Arduino port
     BAUD_RATE = 9600
     
     print(f"Arduino Control Test Script")
-    print(f"Port: {SERIAL_PORT}, Baud Rate: {BAUD_RATE}")
+    print("=" * 50)
+    
+    # Auto-detect Arduino port
+    print("🔍 Searching for Arduino...")
+    arduino_port = find_arduino_port()
+    
+    if not arduino_port:
+        print("❌ No Arduino found!")
+        print("\n📋 Available ports:")
+        list_all_ports()
+        print("💡 Please connect your Arduino and try again.")
+        sys.exit(1)
+    
+    print(f"✅ Using Arduino at: {arduino_port}")
+    print(f"📊 Baud Rate: {BAUD_RATE}")
     print("=" * 50)
     
     try:
         # Connect to Arduino
-        print("Connecting to Arduino...")
-        ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=2)
+        print("🔌 Connecting to Arduino...")
+        ser = serial.Serial(arduino_port, BAUD_RATE, timeout=2)
         time.sleep(2)  # Wait for Arduino to reset
-        print("Connected successfully!")
+        print("✅ Connected successfully!")
         print("=" * 50)
         
         # Test blower controls
@@ -105,23 +124,23 @@ def main():
         # Test invalid commands
         test_invalid_commands(ser)
         
-        print("=== Test completed ===")
+        print("=== ✅ Test completed successfully! ===")
         
     except serial.SerialException as e:
-        print(f"Error connecting to Arduino: {e}")
-        print("Make sure:")
-        print("1. Arduino is connected")
-        print("2. Correct port is specified")
-        print("3. Arduino is not being used by another application")
+        print(f"❌ Error connecting to Arduino: {e}")
+        print("💡 Make sure:")
+        print("   • Arduino is connected")
+        print("   • Arduino drivers are installed")
+        print("   • Arduino is not being used by another application")
         sys.exit(1)
     except KeyboardInterrupt:
-        print("\nTest interrupted by user")
+        print("\n⚠️  Test interrupted by user")
     except Exception as e:
-        print(f"Unexpected error: {e}")
+        print(f"❌ Unexpected error: {e}")
     finally:
         if 'ser' in locals() and ser.is_open:
             ser.close()
-            print("Serial connection closed")
+            print("🔌 Serial connection closed")
 
 if __name__ == "__main__":
     main()

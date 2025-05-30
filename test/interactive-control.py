@@ -5,8 +5,14 @@ Allows manual sending of control commands to Arduino
 """
 
 import serial
+import serial.tools.list_ports
 import time
 import sys
+import os
+
+# Add the src directory to the path so we can import our utils
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
+from utils.arduino_detector import find_arduino_port, list_all_ports
 
 def display_menu():
     """Display the command menu"""
@@ -88,17 +94,31 @@ def get_custom_speed():
 
 def main():
     # Configuration
-    SERIAL_PORT = '/dev/ttyUSB0'  # Change this to match your Arduino port
     BAUD_RATE = 9600
     
-    print("Arduino Interactive Control Test")
-    print(f"Connecting to {SERIAL_PORT} at {BAUD_RATE} baud...")
+    print("🤖 Arduino Interactive Control Test")
+    print("=" * 50)
+    
+    # Auto-detect Arduino port
+    print("🔍 Searching for Arduino...")
+    arduino_port = find_arduino_port()
+    
+    if not arduino_port:
+        print("❌ No Arduino found!")
+        print("\n📋 Available ports:")
+        list_all_ports()
+        print("💡 Please connect your Arduino and try again.")
+        return
+    
+    print(f"✅ Using Arduino at: {arduino_port}")
+    print(f"📊 Baud Rate: {BAUD_RATE}")
+    print("🔌 Connecting to Arduino...")
     
     try:
         # Connect to Arduino
-        ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=2)
+        ser = serial.Serial(arduino_port, BAUD_RATE, timeout=2)
         time.sleep(2)  # Wait for Arduino to reset
-        print("Connected successfully!")
+        print("✅ Connected successfully!")
         
         while True:
             display_menu()
@@ -107,7 +127,7 @@ def main():
                 choice = input("\nEnter your choice (0-10): ").strip()
                 
                 if choice == "0":
-                    print("Exiting...")
+                    print("👋 Exiting...")
                     break
                     
                 elif choice == "1":
@@ -118,7 +138,8 @@ def main():
                     
                 elif choice == "3":
                     speed = get_custom_speed()
-                    send_command(ser, f"[control]:blower:speed:{speed}\n")
+                    if speed is not None:
+                        send_command(ser, f"[control]:blower:speed:{speed}\n")
                     
                 elif choice == "4":
                     send_command(ser, "[control]:blower:direction:reverse\n")
@@ -139,34 +160,32 @@ def main():
                     run_automatic_test(ser)
                     
                 elif choice == "10":
-                    custom_cmd = input("Enter custom command: ")
-                    if not custom_cmd.endswith('\n'):
-                        custom_cmd += '\n'
-                    send_command(ser, custom_cmd)
+                    custom_command = input("Enter custom command: ")
+                    if not custom_command.endswith('\n'):
+                        custom_command += '\n'
+                    send_command(ser, custom_command)
                     
                 else:
-                    print("Invalid choice. Please try again.")
+                    print("❌ Invalid choice. Please try again.")
                     
             except KeyboardInterrupt:
-                print("\nOperation cancelled")
+                print("\n⚠️  Returning to menu...")
                 continue
                 
     except serial.SerialException as e:
-        print(f"Error connecting to Arduino: {e}")
-        print("\nTroubleshooting:")
-        print("1. Check if Arduino is connected")
-        print("2. Verify the correct port (ls /dev/tty* on Linux/Mac)")
-        print("3. Make sure no other application is using the port")
-        print("4. Try different baud rates if needed")
-        sys.exit(1)
-        
+        print(f"❌ Error connecting to Arduino: {e}")
+        print("💡 Make sure:")
+        print("   • Arduino is connected")
+        print("   • Arduino drivers are installed")
+        print("   • Arduino is not being used by another application")
+    except KeyboardInterrupt:
+        print("\n⚠️  Program interrupted by user")
     except Exception as e:
-        print(f"Unexpected error: {e}")
-        
+        print(f"❌ Unexpected error: {e}")
     finally:
         if 'ser' in locals() and ser.is_open:
             ser.close()
-            print("Serial connection closed")
+            print("🔌 Serial connection closed")
 
 if __name__ == "__main__":
     main() 
