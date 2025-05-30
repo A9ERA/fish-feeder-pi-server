@@ -1,5 +1,5 @@
 """
-Main entry point for the Pi MQTT Server application
+Main entry point for the Pi Server application
 """
 from src.services.serial_service import SerialService
 from src.services.api_service import APIService
@@ -18,10 +18,10 @@ def main():
         return
 
     # Initialize and start API service in a separate thread
-    # api_service = APIService()
-    # api_thread = threading.Thread(target=api_service.start, daemon=True)
-    # api_thread.start()
-    # print("API server started on http://0.0.0.0:5000")
+    api_service = APIService(serial_service=serial_service)
+    api_thread = threading.Thread(target=api_service.start, daemon=True)
+    api_thread.start()
+    print("API server started on http://0.0.0.0:5000")
 
     try:
         # Keep the main thread alive

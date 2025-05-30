@@ -7,9 +7,10 @@ from flask_cors import CORS
 from pathlib import Path
 import time
 from .video_stream_service import VideoStreamService
+from .control_service import ControlService
 
 class APIService:
-    def __init__(self, host='0.0.0.0', port=5000):
+    def __init__(self, host='0.0.0.0', port=5000, serial_service=None):
         self.app = Flask(__name__, 
                         template_folder=Path(__file__).parent.parent / 'templates',
                         static_folder=Path(__file__).parent.parent.parent / 'static')
@@ -20,6 +21,7 @@ class APIService:
         self.sensors_file = Path(__file__).parent.parent / 'data' / 'sensors_data.jsonc'
         self.start_time = time.time()
         self.video_service = VideoStreamService()  # Initialize video service
+        self.control_service = ControlService(serial_service)  # Initialize control service
         
         # Register routes
         self.app.route('/api/sensors/<sensor_name>')(self.get_sensor_data)
@@ -33,6 +35,10 @@ class APIService:
         self.app.route('/api/camera/record/start', methods=['POST'])(self.start_recording)
         self.app.route('/api/camera/record/stop', methods=['POST'])(self.stop_recording)
         self.app.route('/api/camera/audio/record', methods=['POST'])(self.record_audio)
+        
+        # Device control routes
+        self.app.route('/api/control/blower', methods=['POST'])(self.control_blower)
+        self.app.route('/api/control/actuator', methods=['POST'])(self.control_actuator_motor)
 
     def index(self):
         """Render the main video streaming page"""
@@ -162,6 +168,115 @@ class APIService:
         except Exception as e:
             return jsonify({
                 'error': f'Error retrieving sensors list: {str(e)}'
+            }), 500
+
+    def control_blower(self):
+        """Control blower device via API"""
+        try:
+            if not request.is_json:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Request must be JSON'
+                }), 400
+
+            data = request.get_json()
+            action = data.get('action')
+            value = data.get('value')  # For speed setting
+
+            if not action:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Action is required'
+                }), 400
+
+            # Validate actions
+            valid_actions = ['start', 'stop', 'speed', 'direction_reverse', 'direction_normal']
+            if action not in valid_actions:
+                return jsonify({
+                    'status': 'error',
+                    'message': f'Invalid action {action}. Valid actions are: {", ".join(valid_actions)}'
+                }), 400
+
+            # For speed action, validate value
+            if action == 'speed':
+                if value is None:
+                    return jsonify({
+                        'status': 'error',
+                        'message': 'Value is required for speed action'
+                    }), 400
+                if not isinstance(value, int) or value < 0:
+                    return jsonify({
+                        'status': 'error',
+                        'message': 'Speed value must be a positive integer'
+                    }), 400
+
+            # Send command via control service
+            success = self.control_service.control_blower(action, value)
+
+            if success:
+                message = f"Blower {action} command sent successfully"
+                if action == 'speed':
+                    message = f"Blower speed set to {value}"
+                return jsonify({
+                    'status': 'success',
+                    'message': message
+                })
+            else:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Failed to send command to device'
+                }), 500
+
+        except Exception as e:
+            return jsonify({
+                'status': 'error',
+                'message': f'Error controlling blower: {str(e)}'
+            }), 500
+
+    def control_actuator_motor(self):
+        """Control actuator motor device via API"""
+        try:
+            if not request.is_json:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Request must be JSON'
+                }), 400
+
+            data = request.get_json()
+            action = data.get('action')
+
+            if not action:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Action is required'
+                }), 400
+
+            # Validate actions
+            valid_actions = ['up', 'down', 'stop']
+            if action not in valid_actions:
+                return jsonify({
+                    'status': 'error',
+                    'message': f'Invalid action. Valid actions are: {", ".join(valid_actions)}'
+                }), 400
+
+            # Send command via control service
+            success = self.control_service.control_actuator_motor(action)
+
+            if success:
+                return jsonify({
+                    'status': 'success',
+                    'message': f"Actuator motor {action} command sent successfully"
+                })
+            else:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Failed to send command to device'
+                }), 500
+
+        except Exception as e:
+            return jsonify({
+                'status': 'error',
+                'message': f'Error controlling actuator motor: {str(e)}'
             }), 500
 
     def start(self):

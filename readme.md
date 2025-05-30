@@ -19,3 +19,8 @@ Setup ngrok
 ```bash
 ngrok config add-authtoken < token >
 ```
+
+To monitor a serial port
+```bash
+screen /dev/ttyUSB0 9600
+```
