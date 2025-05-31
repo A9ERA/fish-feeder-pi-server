@@ -8,6 +8,8 @@ from pathlib import Path
 import time
 from .video_stream_service import VideoStreamService
 from .control_service import ControlService
+from .firebase_service import FirebaseService
+from .sensor_data_service import SensorDataService
 
 class APIService:
     def __init__(self, host='0.0.0.0', port=5000, serial_service=None):
@@ -22,15 +24,20 @@ class APIService:
         self.start_time = time.time()
         self.video_service = VideoStreamService()  # Initialize video service
         self.control_service = ControlService(serial_service)  # Initialize control service
+        self.firebase_service = FirebaseService()  # Initialize Firebase service
+        self.sensor_data_service = SensorDataService()  # Initialize sensor data service
         
-        # Register routes
+        # Health check route
+        self.app.route('/')(self.index)
+        self.app.route('/health')(self.health_check)
+
+        # Sensor data routes
         self.app.route('/api/sensors/<sensor_name>')(self.get_sensor_data)
         self.app.route('/api/sensors')(self.get_all_sensors)
-        self.app.route('/health')(self.health_check)
-        self.app.route('/video_feed')(self.video_feed)
-        self.app.route('/')(self.index)
+        self.app.route('/api/sensors/sync', methods=['POST'])(self.sync_sensors_to_firebase)
         
-        # Camera control routes
+        # Camera routes
+        self.app.route('/api/camera/video_feed')(self.video_feed)
         self.app.route('/api/camera/photo', methods=['POST'])(self.take_photo)
         self.app.route('/api/camera/record/start', methods=['POST'])(self.start_recording)
         self.app.route('/api/camera/record/stop', methods=['POST'])(self.stop_recording)
@@ -136,15 +143,22 @@ class APIService:
     def get_sensor_data(self, sensor_name):
         """Get data for a specific sensor by name"""
         try:
-            with open(self.sensors_file, 'r') as f:
-                data = json5.loads(f.read())  # Use json5 instead of json for JSONC support
+            # Use sensor data service instead of reading file directly
+            all_data = self.sensor_data_service.get_sensor_data()
+            
+            # Check if there's an error from sensor data service
+            if 'error' in all_data:
+                return jsonify({
+                    'error': f'Error retrieving sensor data: {all_data["error"]}'
+                }), 500
                 
-            if sensor_name not in data['sensors']:
+            # Check if sensor exists
+            if sensor_name not in all_data.get('sensors', {}):
                 return jsonify({
                     'error': f'Sensor {sensor_name} not found'
                 }), 404
                 
-            return jsonify(data['sensors'][sensor_name])
+            return jsonify(all_data['sensors'][sensor_name])
             
         except Exception as e:
             return jsonify({
@@ -154,13 +168,19 @@ class APIService:
     def get_all_sensors(self):
         """Get list of all available sensors"""
         try:
-            with open(self.sensors_file, 'r') as f:
-                data = json5.loads(f.read())  # Use json5 instead of json for JSONC support
+            # Use sensor data service instead of reading file directly
+            all_data = self.sensor_data_service.get_sensor_data()
+            
+            # Check if there's an error from sensor data service
+            if 'error' in all_data:
+                return jsonify({
+                    'error': f'Error retrieving sensors list: {all_data["error"]}'
+                }), 500
                 
             # Return just the sensor names and descriptions
             sensors = {
-                name: {'description': info['description']}
-                for name, info in data['sensors'].items()
+                name: {'description': info.get('description', 'No description available')}
+                for name, info in all_data.get('sensors', {}).items()
             }
             
             return jsonify(sensors)
@@ -277,6 +297,41 @@ class APIService:
             return jsonify({
                 'status': 'error',
                 'message': f'Error controlling actuator motor: {str(e)}'
+            }), 500
+
+    def sync_sensors_to_firebase(self):
+        """Sync current sensor data to Firebase Realtime Database"""
+        try:
+            # Get current sensor data from local storage
+            sensor_data = self.sensor_data_service.get_sensor_data()
+            
+            # Check if sensor data exists
+            if 'error' in sensor_data:
+                return jsonify({
+                    'status': 'error',
+                    'message': f'Failed to read sensor data: {sensor_data["error"]}'
+                }), 500
+            
+            # Sync to Firebase
+            success = self.firebase_service.sync_sensor_data(sensor_data)
+            
+            if success:
+                return jsonify({
+                    'status': 'success',
+                    'message': 'Sensor data synced to Firebase successfully',
+                    'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
+                    'synced_sensors': list(sensor_data.get('sensors', {}).keys())
+                })
+            else:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Failed to sync sensor data to Firebase'
+                }), 500
+                
+        except Exception as e:
+            return jsonify({
+                'status': 'error',
+                'message': f'Error syncing sensor data: {str(e)}'
             }), 500
 
     def start(self):

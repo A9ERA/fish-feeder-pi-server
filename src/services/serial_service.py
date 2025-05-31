@@ -7,7 +7,7 @@ import json
 import threading
 from typing import Optional
 from src.services.sensor_data_service import SensorDataService
-from src.config.settings import SERIAL_PORT, BAUD_RATE
+from src.config.settings import BAUD_RATE
 
 class SerialService:
     def __init__(self, port: str = None, baud_rate: int = BAUD_RATE):
@@ -18,7 +18,7 @@ class SerialService:
             port: Serial port (if None, will auto-detect Arduino)
             baud_rate: Baud rate for serial communication (default from settings)
         """
-        self.port = port or self.find_arduino_port() or SERIAL_PORT
+        self.port = port or self.find_arduino_port()
         self.baud_rate = baud_rate
         self.serial = None
         self.is_running = False
