@@ -4,7 +4,6 @@ Control Service for sending commands to Arduino devices
 import threading
 from typing import Optional
 from src.services.serial_service import SerialService
-from src.config.settings import SERIAL_PORT, BAUD_RATE
 
 class ControlService:
     def __init__(self, serial_service: Optional[SerialService] = None):
