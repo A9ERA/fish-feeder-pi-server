@@ -1,0 +1,101 @@
+{
+    "last_updated": "2025-05-18 10:00:00",  // last updated timestamp of all sensors
+    "sensors": {
+        "DHT22_FEEDER": {
+            "last_updated": "2025-05-18 10:00:00",
+            "description": "Temperature and humidity in the feeder bucket",
+            "values": [
+                {
+                    "type": "temperature",
+                    "timestamp": "2025-05-18 10:00:00",
+                    "unit": "C",
+                    "value": 22.5
+                },
+                {
+                    "type": "humidity",
+                    "timestamp": "2025-05-18 10:00:00",
+                    "unit": "%",
+                    "value": 45.2
+                }
+            ]
+        },
+        "DHT22_SYSTEM": {
+            "last_updated": "2025-05-18 10:00:00",
+            "description": "Temperature and humidity in the control box",
+            "values": [
+                {
+                    "type": "temperature",
+                    "timestamp": "2025-05-18 10:00:00",
+                    "unit": "C",
+                    "value": 22.5
+                },
+                {
+                    "type": "humidity",
+                    "timestamp": "2025-05-18 10:00:00",
+                    "unit": "%",
+                    "value": 45.2
+                }
+            ]
+        },
+        "SOIL_MOISTURE": {
+            "last_updated": "2025-05-18 10:00:00",
+            "description": "Soil moisture in the feeder bucket",
+            "values": [
+                {
+                    "type": "moisture",
+                    "timestamp": "2025-05-18 10:00:00",
+                    "unit": "%",
+                    "value": 45.2
+                }
+            ]
+        },
+        "DS18B20_WATER_TEMP": {
+            "last_updated": "2025-05-18 10:00:00",
+            "description": "Water temperature in the feeder bucket",
+            "values": [
+                {
+                    "type": "temperature",
+                    "timestamp": "2025-05-18 10:00:00",
+                    "unit": "C",
+                    "value": 22.5
+                }
+            ]
+        },
+        "HX711_FEEDER": {
+            "last_updated": "2025-05-18 10:00:00",
+            "description": "Weight of the feeder bucket",
+            "values": [
+                {
+                    "type": "weight",
+                    "timestamp": "2025-05-18 10:00:00",
+                    "unit": "kg",
+                    "value": 3.5
+                }
+            ]
+        },
+        "VOLTAGE_SYSTEM": {
+            "last_updated": "2025-05-18 10:00:00",
+            "description": "Voltage of the system",
+            "values": [
+                {
+                    "type": "voltage",
+                    "timestamp": "2025-05-18 10:00:00",
+                    "unit": "V",
+                    "value": 12.0
+                }
+            ]
+        },
+        "CURRENT_SYSTEM": {
+            "last_updated": "2025-05-18 10:00:00",
+            "description": "Current of the system",
+            "values": [
+                {
+                    "type": "current",
+                    "timestamp": "2025-05-18 10:00:00",
+                    "unit": "A",
+                    "value": 1.0
+                }
+            ]
+        }
+    }
+}
