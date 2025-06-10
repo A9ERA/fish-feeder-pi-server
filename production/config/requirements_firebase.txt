@@ -1,0 +1,21 @@
+# 🔥 FIREBASE SYNC - Fish Feeder IoT
+# Background service requirements for global remote control
+# Free, Fast, Global Access!
+
+# Core Python Firebase
+firebase-admin==6.5.0
+
+# Serial communication
+pyserial==3.5
+
+# Basic utilities (already available in standard Python)
+# datetime - built-in
+# time - built-in
+# json - built-in
+# os - built-in
+
+# Optional: For advanced logging
+colorama==0.4.6
+
+# Optional: For system monitoring
+psutil==5.9.8 
