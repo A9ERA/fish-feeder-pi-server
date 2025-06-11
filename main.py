@@ -398,7 +398,7 @@ class ArduinoManager:
             self.logger.error(f"❌ Feed sequence failed: {e}")
             return False, str(e)
     
-        def read_sensors(self):
+    def read_sensors(self):
         """Read sensor data from Arduino"""
         if not self.is_connected or not self.serial_conn:
             return {}
