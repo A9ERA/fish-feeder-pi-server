@@ -1,548 +1,425 @@
-# 🐟 Fish Feeder Pi Controller v3.0
+# 🐟 Fish Feeder Smart Hybrid Storage System
 
-**Raspberry Pi Controller สำหรับระบบให้อาหารปลาอัตโนมัติ พร้อม Web App Integration และระบบกล้องแบบ Real-time**
+<div align="center">
 
-## 📋 Overview
+![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)
+![Platform](https://img.shields.io/badge/platform-Raspberry%20Pi-red.svg)
+![Python](https://img.shields.io/badge/python-3.7+-green.svg)
+![License](https://img.shields.io/badge/license-MIT-yellow.svg)
 
-ระบบควบคุมหลักที่ทำงานบน Raspberry Pi 4 สำหรับการจัดการระบบให้อาหารปลาแบบ IoT พร้อมฟีเจอร์:
+**🎯 ระบบให้อาหารปลาอัตโนมัติ พร้อม Video Recording และ Smart Cloud Storage**
 
-- 🔗 **Arduino Communication**: สื่อสารกับ Arduino Mega 2560 ผ่าน Serial USB
-- 📹 **Live Camera Stream**: ระบบกล้องแบบ Real-time streaming + Photo capture
-- ☁️ **Firebase Integration**: ซิงค์ข้อมูลกับ Cloud Database (Optional)
-- 🌐 **Enhanced REST API**: Web API สำหรับ Web App integration
-- 📊 **Feed Management**: ระบบจัดการการให้อาหารแบบสมบูรณ์
-- 📈 **Statistics & History**: สถิติและประวัติการให้อาหาร
-- 💾 **Offline Mode**: ทำงานได้แม้ไม่มี Internet
+[🚀 Quick Start](#-quick-start) • [📖 Documentation](#-documentation) • [🌐 Demo](#-demo-urls) • [🔧 API](#-api-reference)
 
-## 🌐 Web App Integration
+</div>
 
-ระบบนี้ออกแบบมาเพื่อทำงานร่วมกับ **Fish Feeder Web App**:
-- **Live Demo**: https://fish-feeder-test-1.web.app
-- **GitHub**: https://github.com/iamotakugot/fish-feeder-web
-- **Frontend**: React 18.3.1 + TypeScript + Vite + HeroUI
+---
 
-## 🏗️ System Architecture
+## 🌟 Features Highlights
 
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│  Arduino Mega   │USB │  Raspberry Pi   │WiFi│    Firebase     │
-│  (Sensors &     │────│  (Controller)   │────│  (Cloud DB)     │
-│   Actuators)    │    │                 │    │  [Optional]     │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-                                │                        ▲
-                                │ Camera                 │
-                                ▼                        │
-                        ┌─────────────────┐              │
-                        │   USB Camera    │              │
-                        │ (Live Stream)   │              │
-                        └─────────────────┘              │
-                                                         │
-                        ┌─────────────────┐              │
-                        │   Web App       │              │
-                        │ (React + TS)    │──────────────┘
-                        └─────────────────┘
-```
+<table>
+<tr>
+<td width="50%">
 
-## 🔧 Hardware Requirements
+### 🎬 **Smart Video Recording**
+- 📹 Auto-record ขณะให้อาหาร
+- 🎥 MP4 format พร้อม timestamp
+- 📱 Mobile-friendly playback
+- 🔄 Real-time streaming
 
-### Raspberry Pi 4
-- **Model**: Raspberry Pi 4 (4GB RAM recommended)
-- **OS**: Raspberry Pi OS (Bullseye or newer)
-- **Storage**: 32GB+ microSD card
-- **Camera**: USB Webcam หรือ Pi Camera
+</td>
+<td width="50%">
 
-### Arduino Mega 2560
-- **Connection**: USB cable ต่อกับ Raspberry Pi
-- **Sensors**: DHT22 (2x), DS18B20, HX711, ACS712, Soil sensor
-- **Actuators**: Relay modules, Auger motor, Blower, Actuator
+### ☁️ **Hybrid Cloud Storage**
+- 💾 Pi Local: 128GB
+- 🔥 Firebase: 5GB (instant)
+- 🌐 Google Drive: 200GB
+- **รวม: 333GB!**
 
-## 🚀 Installation
+</td>
+</tr>
+<tr>
+<td>
 
-### 1. ติดตั้ง Python Dependencies
+### 🚀 **One-Click Deploy**
+- 🤖 Auto-setup ทุกอย่าง
+- ⚙️ Systemd service
+- 🔧 Dependencies auto-install
+- ✅ Ready in minutes!
 
-```bash
-# Update system
-sudo apt update && sudo apt upgrade -y
+</td>
+<td>
 
-# Install Python and required packages
-sudo apt install python3 python3-pip python3-venv -y
-sudo apt install libhdf5-dev libhdf5-serial-dev -y
-sudo apt install libatlas-base-dev libjasper-dev -y
+### 🌍 **External Access**
+- 🔗 PageKite tunnel
+- 📱 Mobile web app
+- 🔒 Secure connections
+- 🌏 Access anywhere
 
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate
+</td>
+</tr>
+</table>
 
-# Install Python packages
-pip install -r requirements.txt
-```
+---
 
-### 2. Setup Firebase (Optional)
+## 🚀 Quick Start
 
-1. สร้าง Firebase Project ใน [Firebase Console](https://console.firebase.google.com/)
-2. Enable Realtime Database
-3. Download Service Account Key และบันทึกเป็น `serviceAccountKey.json`
-
-### 3. เชื่อมต่อ Hardware
+### ⚡ One-Click Deployment (แนะนำ)
 
 ```bash
-# เช็ค Arduino port
-ls /dev/ttyUSB* /dev/ttyACM*
+# Clone repository
+git clone <repository-url>
+cd pi-mqtt-server
 
-# เช็คกล้อง
-lsusb | grep Camera
-
-# ตั้งค่า permissions
-sudo usermod -a -G dialout $USER
-sudo usermod -a -G video $USER
-sudo reboot
+# Deploy to Pi ในคำสั่งเดียว!
+python3 deployment/one_click_deploy.py
 ```
 
-## ▶️ Running the System
-
-### แบบ Manual
+### 🎯 Manual Setup
 
 ```bash
-# Activate virtual environment
-source venv/bin/activate
+# Deploy files to Pi
+./deployment/deploy_to_pi.sh
 
-# Run the controller
+# SSH to Pi and setup
+ssh pi@raspberrypi.local
+cd /home/pi/pi-mqtt-server
+./auto_setup_pi.sh
+
+# Setup Google Drive OAuth
+python3 scripts/google_drive_setup.py
+
+# Start system
 python3 main.py
 ```
 
-### แบบ Service (Auto-start)
-
-```bash
-# สร้าง service file
-sudo nano /etc/systemd/system/fish-feeder.service
-```
-
-เพิ่มเนื้อหา:
-```ini
-[Unit]
-Description=Fish Feeder Pi Controller v3.0
-After=network.target
-
-[Service]
-Type=simple
-User=pi
-WorkingDirectory=/home/pi/fish-feeder
-ExecStart=/home/pi/fish-feeder/venv/bin/python main.py
-Restart=always
-RestartSec=10
-Environment=PYTHONUNBUFFERED=1
-
-[Install]
-WantedBy=multi-user.target
-```
-
-```bash
-# Enable และ start service
-sudo systemctl daemon-reload
-sudo systemctl enable fish-feeder.service
-sudo systemctl start fish-feeder.service
-
-# เช็คสถานะ
-sudo systemctl status fish-feeder.service
-
-# ดู logs
-sudo journalctl -u fish-feeder.service -f
-```
-
-## 🌐 API Endpoints (Web App Compatible)
-
-### System Health
-```http
-GET /api/health
-```
-Response:
-```json
-{
-  "status": "ok",
-  "serial_connected": true,
-  "firebase_connected": true,
-  "timestamp": "2024-01-01T12:00:00Z",
-  "server_info": {
-    "version": "3.0.0",
-    "uptime_seconds": 3600
-  },
-  "sensors_available": ["DHT22_FEEDER", "HX711_FEEDER", "DS18B20_WATER_TEMP"]
-}
-```
-
-### Sensor Data (All Sensors)
-```http
-GET /api/sensors
-```
-Response:
-```json
-{
-  "status": "success",
-  "timestamp": "2024-01-01T12:00:00Z",
-  "data": {
-    "DHT22_FEEDER": {
-      "timestamp": "2024-01-01T12:00:00Z",
-      "values": [
-        {
-          "type": "humidity",
-          "value": 65.2,
-          "unit": "%",
-          "timestamp": "2024-01-01T12:00:00Z"
-        }
-      ]
-    },
-    "HX711_FEEDER": {
-      "timestamp": "2024-01-01T12:00:00Z",
-      "values": [
-        {
-          "type": "weight",
-          "value": 1.25,
-          "unit": "kg",
-          "timestamp": "2024-01-01T12:00:00Z"
-        }
-      ]
-    }
-  },
-  "arduino_connected": true
-}
-```
-
-### Specific Sensor Data
-```http
-GET /api/sensors/HX711_FEEDER
-```
-Response:
-```json
-{
-  "sensor_name": "HX711_FEEDER",
-  "values": [
-    {
-      "type": "weight",
-      "value": 1250.5,
-      "unit": "grams",
-      "timestamp": "2024-01-01T12:00:00Z"
-    }
-  ]
-}
-```
-
-### Enhanced Feed Control
-```http
-POST /api/feed
-```
-**Request Body (Preset):**
-```json
-{
-  "action": "medium"  // "small", "medium", "large", "xl"
-}
-```
-
-**Request Body (Custom with Timing):**
-```json
-{
-  "action": "custom",
-  "amount": 100,
-  "actuator_up": 3,
-  "actuator_down": 2,
-  "auger_duration": 20,
-  "blower_duration": 15
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Feed command executed successfully",
-  "feed_id": "feed_20240101_120000",
-  "estimated_duration": 40,
-  "timestamp": "2024-01-01T12:00:00Z",
-  "photo_url": "/photos/photo_20240101_120000.jpg"
-}
-```
-
-### Feed History
-```http
-GET /api/feed/history
-```
-Response:
-```json
-{
-  "data": [
-    {
-      "feed_id": "feed_20240101_120000",
-      "timestamp": "2024-01-01T12:00:00Z",
-      "amount": 100,
-      "type": "manual",
-      "status": "completed",
-      "video_url": "",
-      "duration_seconds": 40,
-      "device_timings": {
-        "actuator_up": 3,
-        "actuator_down": 2,
-        "auger_duration": 20,
-        "blower_duration": 15
-      }
-    }
-  ]
-}
-```
-
-### Feed Statistics
-```http
-GET /api/feed/statistics
-```
-Response:
-```json
-{
-  "total_amount_today": 450,
-  "total_feeds_today": 4,
-  "average_per_feed": 112.5,
-  "last_feed_time": "2024-01-01T12:00:00Z",
-  "daily_target": 500,
-  "target_achieved_percentage": 90.0
-}
-```
-
-### Camera Controls
-```http
-GET /api/camera/stream
-# Returns: multipart/x-mixed-replace MJPEG stream
-
-GET /api/camera/status
-POST /api/camera/photo
-```
-
-### Direct Arduino Commands
-```http
-POST /api/control/direct
-Content-Type: application/json
-{
-  "command": "R:1"  # Any Arduino command (R:1, G:1, B:1, A:1, etc.)
-}
-```
+---
 
 ## 📁 Project Structure
 
 ```
 pi-mqtt-server/
-├── main.py                 # 🎯 Main controller (ALL-IN-ONE)
-├── requirements.txt        # 📦 Python dependencies
-├── serviceAccountKey.json  # 🔑 Firebase credentials (optional)
-├── README.md              # 📖 This documentation
-├── .gitignore             # 🚫 Git ignore rules
-└── logs/                  # 📊 System logs
-    ├── system.log         # 📝 Main system log
-    ├── feed_history.json  # 📈 Feed history database
-    ├── YYYY-MM-DD/        # 📅 Daily sensor logs
-    │   └── sensor_log.txt # 📊 Daily sensor data
-    └── photos/            # 📸 Captured photos
-        └── photo_*.jpg    # 🖼️ Feed session photos
+├── 📄 main.py                    # Core application
+├── 🔧 smart_hybrid_storage.py    # Storage management system
+├── 📊 VERSION                    # Current version
+├── 📋 .gitignore                 # Git ignore rules
+├── 🔐 serviceAccountKey.json     # Firebase credentials
+│
+├── 📂 config/                    # Configuration files
+│   ├── storage_config.json       # Storage settings
+│   ├── google_drive_credentials.json
+│   ├── requirements.txt          # Basic dependencies
+│   └── requirements_enhanced.txt # Full dependencies
+│
+├── 📂 deployment/                # Deployment scripts
+│   ├── one_click_deploy.py       # 🚀 Auto deployment
+│   └── deploy_to_pi.sh          # Manual deployment
+│
+├── 📂 scripts/                   # Utility scripts
+│   ├── setup_hybrid_storage.py  # Storage setup
+│   ├── google_drive_setup.py    # Google Drive OAuth
+│   ├── test_google_drive.py     # Test credentials
+│   ├── integrate_hybrid_storage.py
+│   ├── main_integration.py
+│   ├── start_pagekite.sh        # Start tunnel
+│   ├── stop_pagekite.sh         # Stop tunnel
+│   ├── status_pagekite.sh       # Check status
+│   └── pagekite_setup.py        # PageKite config
+│
+├── 📂 docs/                      # Documentation
+│   ├── README_HYBRID_STORAGE.md # Storage system docs
+│   ├── DEPLOY_INSTRUCTIONS.md   # Setup instructions
+│   ├── SETUP_COMPLETE.md        # Complete setup guide
+│   ├── QUICK_SETUP.md           # Quick reference
+│   └── CHANGELOG.md             # Version history
+│
+├── 📂 storage/                   # Data directory (created on Pi)
+├── 📂 logs/                      # Log files
+└── 📂 .git/                      # Git repository
 ```
-
-## 🧩 System Components
-
-### 1. ArduinoManager
-- **Serial Communication**: USB connection กับ Arduino (Auto-detect port)
-- **Feed Sequence Control**: ควบคุมลำดับการให้อาหารแบบสมบูรณ์
-- **Auto-reconnect**: เชื่อมต่อใหม่เมื่อขาดการเชื่อมต่อ
-- **Command Sending**: ส่งคำสั่งไปยัง Arduino แบบ real-time
-- **Data Parsing**: แปลงข้อมูล JSON จาก Arduino
-
-### 2. CameraManager
-- **Live Streaming**: สตรีมวิดีโอแบบ Real-time (MJPEG)
-- **Photo Capture**: ถ่ายรูปแบบ on-demand และ auto-capture
-- **Threaded Processing**: ประมวลผล frame ใน background
-- **Auto-resolution**: ปรับความละเอียดตาม config
-
-### 3. FeedHistoryManager
-- **Feed Recording**: บันทึกประวัติการให้อาหารทุกครั้ง
-- **Statistics**: คำนวณสถิติรายวันและข้อมูลสรุป
-- **JSON Database**: เก็บข้อมูลในไฟล์ JSON แบบ persistent
-- **Device Timing**: บันทึกเวลาการทำงานของแต่ละอุปกรณ์
-
-### 4. FirebaseManager (Optional)
-- **Cloud Sync**: ซิงค์ข้อมูลกับ Firebase Realtime Database
-- **Offline Mode**: ทำงานได้แม้ไม่มี Firebase connection
-- **Remote Commands**: รับคำสั่งจาก Web App ผ่าน Firebase
-- **Auto-retry**: พยายามเชื่อมต่อใหม่อัตโนมัติ
-
-### 5. WebAPI (Flask)
-- **REST Endpoints**: API ที่เข้ากันได้กับ Web App
-- **CORS Support**: รองรับการเรียกจาก Web browser
-- **Error Handling**: จัดการ error อย่างละเอียด
-- **JSON Responses**: รูปแบบข้อมูลมาตรฐาน
-
-## ⚙️ Configuration
-
-### Feed Presets (ปรับได้ใน main.py)
-```python
-FEED_PRESETS = {
-    "small": {
-        "amount": 50,        # grams
-        "actuator_up": 2,    # seconds
-        "actuator_down": 2,  # seconds
-        "auger_duration": 10,  # seconds
-        "blower_duration": 8   # seconds
-    },
-    "medium": {
-        "amount": 100,
-        "actuator_up": 3,
-        "actuator_down": 2,
-        "auger_duration": 20,
-        "blower_duration": 15
-    },
-    # ... large, xl
-}
-```
-
-### System Config
-```python
-class Config:
-    # Arduino
-    ARDUINO_BAUDRATE = 115200
-    ARDUINO_SCAN_PORTS = ["/dev/ttyUSB0", "/dev/ttyACM0"]  # Linux
-    
-    # Web Server
-    WEB_HOST = "0.0.0.0"
-    WEB_PORT = 5000
-    
-    # Camera
-    CAMERA_INDEX = 0
-    CAMERA_WIDTH = 640
-    CAMERA_HEIGHT = 480
-    CAMERA_FPS = 30
-    
-    # Timing
-    SENSOR_READ_INTERVAL = 3      # seconds
-    FIREBASE_SYNC_INTERVAL = 5    # seconds
-```
-
-## 🔍 Monitoring & Troubleshooting
-
-### Log Files
-```bash
-# System logs
-tail -f logs/system.log
-
-# Daily sensor logs
-tail -f logs/$(date +%Y-%m-%d)/sensor_log.txt
-
-# Service logs
-sudo journalctl -u fish-feeder.service -f
-
-# Check system status
-curl http://localhost:5000/api/health
-```
-
-### Common Issues
-
-#### Arduino Not Connected
-```bash
-# Check USB devices
-lsusb
-
-# Check serial ports
-ls -la /dev/tty*
-
-# Check permissions
-sudo usermod -a -G dialout $USER
-sudo reboot
-```
-
-#### Camera Not Working
-```bash
-# List video devices
-ls /dev/video*
-
-# Test camera
-sudo apt install cheese
-cheese
-
-# Check permissions
-sudo usermod -a -G video $USER
-```
-
-#### Web App Connection Issues
-```bash
-# Test API endpoints
-curl http://localhost:5000/api/health
-curl http://localhost:5000/api/sensors
-
-# Check if port is open
-netstat -tlnp | grep :5000
-
-# Check firewall
-sudo ufw status
-```
-
-## 🌐 Web App Integration Guide
-
-### 1. Web App Setup
-Web App จะ fallback มาเรียก Pi Server API เมื่อ Firebase ไม่เชื่อมต่อ:
-
-```javascript
-// Web App config (fish-feeder-web)
-const API_CONFIG = {
-  BASE_URL: 'http://192.168.1.100:5000',  // Pi IP
-  FALLBACK_ENABLED: true
-}
-```
-
-### 2. Feed Control Integration
-Web App ส่ง feed command พร้อม timing parameters:
-
-```javascript
-// Web App feed request
-const feedData = {
-  action: "custom",
-  amount: 150,
-  actuator_up: 3,
-  actuator_down: 2,
-  auger_duration: 25,
-  blower_duration: 20
-}
-
-fetch('/api/feed', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify(feedData)
-})
-```
-
-### 3. Real-time Monitoring
-```javascript
-// Sensor data polling (Web App)
-setInterval(() => {
-  fetch('/api/sensors')
-    .then(response => response.json())
-    .then(data => updateSensorDisplay(data))
-}, 3000)  // Every 3 seconds
-```
-
-## 📱 Mobile Access
-
-- **Local Network**: `http://pi-ip:5000` (direct access)
-- **Remote Access**: ใช้ VPN หรือ port forwarding
-- **Web App**: https://fish-feeder-test-1.web.app (cloud-hosted)
-
-## 🔒 Security
-
-- ใช้ strong passwords สำหรับ Pi account
-- ตั้งค่า firewall อย่างเหมาะสม
-- อัพเดทระบบเป็นประจำ
-- ใช้ VPN สำหรับ remote access
-
-## 📞 Support
-
-- **Web App GitHub**: https://github.com/iamotakugot/fish-feeder-web
-- **Arduino Documentation**: `../fish-feeder-arduino/README.md`
-- **API Documentation**: ดูจาก source code หรือ `/api/health`
-
-## 📄 License
-
-MIT License - ใช้งานได้อย่างอิสระ
 
 ---
 
-**🐟 Happy Fish Feeding with Complete Integration! 🐟**
+## 💾 Smart Storage System
+
+### 🔄 Auto Migration Flow
+
+```mermaid
+graph LR
+    A[📹 Video Recording] --> B[💾 Pi Local 128GB]
+    B --> C[🔥 Firebase 5GB]
+    C --> D[🌐 Google Drive 200GB]
+    D --> E[🗑️ Pi Cleanup]
+    
+    style A fill:#ff6b6b
+    style B fill:#4ecdc4
+    style C fill:#45b7d1
+    style D fill:#96ceb4
+    style E fill:#feca57
+```
+
+### 📊 Storage Capacity
+
+| Storage Tier | Capacity | Purpose | Auto-cleanup |
+|-------------|----------|---------|--------------|
+| **Pi Local** | 128GB | Live recording, recent files | 7 days |
+| **Firebase** | 5GB | Immediate cloud backup | 24 hours → Google Drive |
+| **Google Drive** | 200GB | Long-term archive | Manual |
+| **Total Effective** | **333GB** | Smart hybrid system | Automatic |
+
+---
+
+## 🌐 Demo URLs
+
+| Service | URL | Purpose |
+|---------|-----|---------|
+| 🖥️ **Main Web App** | https://fish-feeder-test-1.web.app | Primary control panel |
+| 🌍 **External Access** | https://b65iee02.pagekite.me | PageKite tunnel |
+| 🏠 **Local Access** | http://localhost:5000 | Direct Pi access |
+
+---
+
+## 🔧 API Reference
+
+### 🎬 Video Recording
+```bash
+# Start recording
+POST /api/camera/record/start
+{"duration": 30, "quality": "high"}
+
+# Stop recording  
+POST /api/camera/record/stop
+
+# Get recording status
+GET /api/camera/record/status
+```
+
+### 🌐 PageKite Control
+```bash
+# Start tunnel
+POST /api/pagekite/start
+
+# Stop tunnel
+POST /api/pagekite/stop
+
+# Check status
+GET /api/pagekite/status
+```
+
+### 💾 Storage Management
+```bash
+# Get storage info
+GET /api/storage/status
+
+# Force migration
+POST /api/storage/migrate
+{"source": "local", "target": "google_drive"}
+
+# Cleanup old files
+POST /api/storage/cleanup
+{"days": 7}
+```
+
+### 🐟 Fish Feeding
+```bash
+# Feed fish (with video)
+POST /api/feed
+{"amount": 1, "record_video": true}
+
+# Get feeding history
+GET /api/feeding/history
+
+# Get last feeding
+GET /api/feeding/last
+```
+
+---
+
+## ⚙️ System Requirements
+
+### 🔧 Hardware
+- **Raspberry Pi 4** (recommended) or Pi 3B+
+- **Camera Module** (Pi Camera or USB webcam)
+- **SD Card** 32GB+ (OS) + 128GB+ USB drive (storage)
+- **Internet Connection** (WiFi or Ethernet)
+
+### 💻 Software
+- **Raspberry Pi OS** (latest)
+- **Python 3.7+**
+- **Git**
+- **SSH enabled**
+
+### 🌐 Cloud Services
+- **Firebase Project** (free tier: 5GB)
+- **Google Drive API** (200GB+ recommended)
+- **PageKite Account** (free tier available)
+
+---
+
+## 🛠️ Development
+
+### 🔄 Local Development
+```bash
+# Install dependencies
+pip3 install -r config/requirements_enhanced.txt
+
+# Run development server
+python3 main.py
+
+# Run tests
+python3 scripts/test_google_drive.py
+```
+
+### 🧪 Testing
+```bash
+# Test storage system
+python3 -c "
+from smart_hybrid_storage import SmartHybridStorage
+storage = SmartHybridStorage()
+print(storage.get_storage_status())
+"
+
+# Test PageKite
+./scripts/status_pagekite.sh
+
+# Test camera
+raspistill -o test.jpg
+```
+
+---
+
+## 📋 Configuration
+
+### 🔧 Storage Config (`config/storage_config.json`)
+```json
+{
+  "pi_local": {
+    "path": "/home/pi/fish_feeder_data",
+    "max_size_gb": 128,
+    "cleanup_days": 7
+  },
+  "firebase": {
+    "max_size_gb": 5,
+    "bucket": "fish-feeder-test-1.appspot.com"
+  },
+  "google_drive": {
+    "max_size_gb": 200,
+    "folder_name": "FishFeeder_Videos"
+  },
+  "pagekite": {
+    "subdomain": "b65iee02.pagekite.me",
+    "local_port": 5000
+  }
+}
+```
+
+### 🔐 Environment Variables
+```bash
+export GOOGLE_APPLICATION_CREDENTIALS="config/google_drive_credentials.json"
+export FIREBASE_SERVICE_ACCOUNT="serviceAccountKey.json"
+export PAGEKITE_SUBDOMAIN="b65iee02.pagekite.me"
+```
+
+---
+
+## 🚨 Troubleshooting
+
+<details>
+<summary>📦 <strong>Deployment Issues</strong></summary>
+
+```bash
+# Check Pi connection
+ping raspberrypi.local
+
+# Test SSH
+ssh pi@raspberrypi.local
+
+# Re-deploy
+python3 deployment/one_click_deploy.py
+```
+</details>
+
+<details>
+<summary>☁️ <strong>Storage Issues</strong></summary>
+
+```bash
+# Check storage status
+python3 -c "
+from smart_hybrid_storage import SmartHybridStorage
+storage = SmartHybridStorage()
+print(storage.get_storage_status())
+"
+
+# Test Google Drive
+python3 scripts/test_google_drive.py
+
+# Re-setup OAuth
+python3 scripts/google_drive_setup.py
+```
+</details>
+
+<details>
+<summary>🌐 <strong>PageKite Issues</strong></summary>
+
+```bash
+# Check status
+./scripts/status_pagekite.sh
+
+# Restart tunnel
+./scripts/stop_pagekite.sh
+./scripts/start_pagekite.sh
+
+# Re-configure
+python3 scripts/pagekite_setup.py
+```
+</details>
+
+<details>
+<summary>🎬 <strong>Video Recording Issues</strong></summary>
+
+```bash
+# Test camera
+raspistill -o test.jpg
+
+# Check permissions
+ls -la /home/pi/fish_feeder_data/
+
+# Fix permissions
+sudo chown -R pi:pi /home/pi/fish_feeder_data/
+```
+</details>
+
+---
+
+## 📜 License
+
+MIT License - feel free to use and modify!
+
+---
+
+## 🤝 Contributing
+
+1. Fork the project
+2. Create feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit changes (`git commit -m 'Add amazing feature'`)
+4. Push to branch (`git push origin feature/amazing-feature`)
+5. Open Pull Request
+
+---
+
+## 📞 Support
+
+- 📖 **Documentation**: Check `docs/` folder
+- 🐛 **Issues**: Open GitHub issue
+- 💬 **Discussions**: GitHub discussions
+- 📧 **Contact**: [Your email]
+
+---
+
+<div align="center">
+
+**🎉 Made with ❤️ for Smart Fish Feeding**
+
+⭐ **Star this repo if it helped you!** ⭐
+
+</div>

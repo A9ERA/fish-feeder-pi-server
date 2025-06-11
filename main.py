@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
-🐟 FISH FEEDER Pi CONTROLLER v3.0
+🐟 FISH FEEDER Pi CONTROLLER v3.1
 =================================
 Complete Pi Controller for Arduino-based Fish Feeding System with Web App Integration
++ Real-time WebSocket Support + Advanced Configuration Management
 """
 
 import sys, json, time, logging, threading, traceback, signal, os, re
@@ -18,6 +19,7 @@ import serial.tools.list_ports
 # Web framework
 from flask import Flask, jsonify, request, Response
 from flask_cors import CORS
+from flask_socketio import SocketIO, emit, disconnect
 
 # Firebase
 import firebase_admin
@@ -45,6 +47,11 @@ class Config:
     WEB_PORT = 5000
     WEB_DEBUG = False
     
+    # WebSocket Configuration (NEW)
+    WEBSOCKET_ENABLED = True
+    WEBSOCKET_PING_TIMEOUT = 60
+    WEBSOCKET_PING_INTERVAL = 25
+    
     # Firebase
     FIREBASE_CRED_FILE = "serviceAccountKey.json"
     FIREBASE_DATABASE_URL = "https://fish-feeder-test-1-default-rtdb.asia-southeast1.firebasedatabase.app"
@@ -54,6 +61,7 @@ class Config:
     SENSOR_READ_INTERVAL = 3
     FIREBASE_SYNC_INTERVAL = 5
     STATUS_BROADCAST_INTERVAL = 10
+    WEBSOCKET_BROADCAST_INTERVAL = 2  # Real-time updates every 2 seconds
     
     # Camera
     CAMERA_INDEX = 0
@@ -75,6 +83,55 @@ class Config:
         "fan_on": "R:2", "fan_off": "R:0", "fan_toggle": "R:2",
         "pump_on": "R:3", "pump_off": "R:0"
     }
+    
+    # Advanced Configuration (NEW)
+    CONFIG_FILE = "config.json"
+    AUTO_FEED_ENABLED = False
+    AUTO_FEED_SCHEDULE = [
+        {"time": "08:00", "preset": "medium", "enabled": True},
+        {"time": "14:00", "preset": "small", "enabled": True},
+        {"time": "18:00", "preset": "medium", "enabled": True}
+    ]
+    
+    @classmethod
+    def load_from_file(cls):
+        """Load configuration from file"""
+        try:
+            if Path(cls.CONFIG_FILE).exists():
+                with open(cls.CONFIG_FILE, 'r', encoding='utf-8') as f:
+                    config_data = json.load(f)
+                    
+                # Update class attributes from file
+                for key, value in config_data.items():
+                    if hasattr(cls, key.upper()):
+                        setattr(cls, key.upper(), value)
+                        
+        except Exception as e:
+            logging.getLogger(__name__).error(f"Failed to load config: {e}")
+    
+    @classmethod
+    def save_to_file(cls):
+        """Save current configuration to file"""
+        try:
+            config_data = {
+                'sensor_read_interval': cls.SENSOR_READ_INTERVAL,
+                'firebase_sync_interval': cls.FIREBASE_SYNC_INTERVAL,
+                'websocket_broadcast_interval': cls.WEBSOCKET_BROADCAST_INTERVAL,
+                'auto_feed_enabled': cls.AUTO_FEED_ENABLED,
+                'auto_feed_schedule': cls.AUTO_FEED_SCHEDULE,
+                'feed_presets': cls.FEED_PRESETS,
+                'camera_settings': {
+                    'width': cls.CAMERA_WIDTH,
+                    'height': cls.CAMERA_HEIGHT,
+                    'fps': cls.CAMERA_FPS
+                }
+            }
+            
+            with open(cls.CONFIG_FILE, 'w', encoding='utf-8') as f:
+                json.dump(config_data, f, indent=2, ensure_ascii=False)
+                
+        except Exception as e:
+            logging.getLogger(__name__).error(f"Failed to save config: {e}")
 
 # ==============================================================================
 # LOGGING SETUP
@@ -645,23 +702,332 @@ class FirebaseManager:
 # WEB API
 # ==============================================================================
 
-class WebAPI:
-    """Flask-based Web API"""
+class ConfigurationManager:
+    """Enhanced Configuration Management with Auto-Feed Scheduler"""
     
-    def __init__(self, arduino_mgr, firebase_mgr, camera_mgr, feed_history_mgr, logger):
+    def __init__(self, logger):
+        self.logger = logger
+        self.auto_feed_thread = None
+        self.auto_feed_stop_event = threading.Event()
+        
+    def get_current_config(self):
+        """Get current system configuration"""
+        return {
+            'timing': {
+                'sensor_read_interval': Config.SENSOR_READ_INTERVAL,
+                'firebase_sync_interval': Config.FIREBASE_SYNC_INTERVAL,
+                'websocket_broadcast_interval': Config.WEBSOCKET_BROADCAST_INTERVAL
+            },
+            'feeding': {
+                'auto_feed_enabled': Config.AUTO_FEED_ENABLED,
+                'auto_feed_schedule': Config.AUTO_FEED_SCHEDULE,
+                'feed_presets': Config.FEED_PRESETS
+            },
+            'camera': {
+                'width': Config.CAMERA_WIDTH,
+                'height': Config.CAMERA_HEIGHT,
+                'fps': Config.CAMERA_FPS
+            },
+            'websocket': {
+                'enabled': Config.WEBSOCKET_ENABLED,
+                'ping_timeout': Config.WEBSOCKET_PING_TIMEOUT,
+                'ping_interval': Config.WEBSOCKET_PING_INTERVAL
+            }
+        }
+    
+    def update_config(self, new_config):
+        """Update configuration dynamically"""
+        try:
+            # Update timing settings
+            if 'timing' in new_config:
+                timing = new_config['timing']
+                if 'sensor_read_interval' in timing:
+                    Config.SENSOR_READ_INTERVAL = max(1, int(timing['sensor_read_interval']))
+                if 'firebase_sync_interval' in timing:
+                    Config.FIREBASE_SYNC_INTERVAL = max(5, int(timing['firebase_sync_interval']))
+                if 'websocket_broadcast_interval' in timing:
+                    Config.WEBSOCKET_BROADCAST_INTERVAL = max(1, int(timing['websocket_broadcast_interval']))
+            
+            # Update feeding settings
+            if 'feeding' in new_config:
+                feeding = new_config['feeding']
+                if 'auto_feed_enabled' in feeding:
+                    Config.AUTO_FEED_ENABLED = bool(feeding['auto_feed_enabled'])
+                if 'auto_feed_schedule' in feeding:
+                    Config.AUTO_FEED_SCHEDULE = feeding['auto_feed_schedule']
+                if 'feed_presets' in feeding:
+                    Config.FEED_PRESETS.update(feeding['feed_presets'])
+            
+            # Update camera settings
+            if 'camera' in new_config:
+                camera = new_config['camera']
+                if 'width' in camera:
+                    Config.CAMERA_WIDTH = int(camera['width'])
+                if 'height' in camera:
+                    Config.CAMERA_HEIGHT = int(camera['height'])
+                if 'fps' in camera:
+                    Config.CAMERA_FPS = int(camera['fps'])
+            
+            # Save to file
+            Config.save_to_file()
+            
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Failed to update config: {e}")
+            return False
+    
+    def start_auto_feed_scheduler(self, arduino_mgr, feed_history_mgr):
+        """Start automatic feeding scheduler"""
+        if self.auto_feed_thread and self.auto_feed_thread.is_alive():
+            return  # Already running
+        
+        self.auto_feed_stop_event.clear()
+        
+        def scheduler_loop():
+            self.logger.info("🤖 Auto feed scheduler started")
+            
+            while not self.auto_feed_stop_event.is_set():
+                try:
+                    if Config.AUTO_FEED_ENABLED:
+                        current_time = datetime.now().strftime("%H:%M")
+                        
+                        for schedule_item in Config.AUTO_FEED_SCHEDULE:
+                            if (schedule_item['enabled'] and 
+                                schedule_item['time'] == current_time):
+                                
+                                preset = schedule_item['preset']
+                                
+                                if preset in Config.FEED_PRESETS:
+                                    preset_data = Config.FEED_PRESETS[preset]
+                                    
+                                    # Execute feed command
+                                    success = arduino_mgr.execute_feed_sequence(
+                                        preset_data['amount'],
+                                        preset_data['actuator_up'],
+                                        preset_data['actuator_down'],
+                                        preset_data['auger_duration'],
+                                        preset_data['blower_duration']
+                                    )
+                                    
+                                    if success:
+                                        # Record feed history
+                                        feed_history_mgr.add_feed_record(
+                                            preset_data['amount'],
+                                            preset,
+                                            preset_data
+                                        )
+                                        
+                                        self.logger.info(f"🍽️ Auto feed executed: {preset} at {current_time}")
+                                    else:
+                                        self.logger.error(f"❌ Auto feed failed: {preset} at {current_time}")
+                
+                    # Check every minute
+                    time.sleep(60)
+                    
+                except Exception as e:
+                    self.logger.error(f"Auto feed scheduler error: {e}")
+                    time.sleep(60)
+        
+        self.auto_feed_thread = threading.Thread(target=scheduler_loop, daemon=True)
+        self.auto_feed_thread.start()
+    
+    def stop_auto_feed_scheduler(self):
+        """Stop automatic feeding scheduler"""
+        if self.auto_feed_thread:
+            self.auto_feed_stop_event.set()
+            self.auto_feed_thread.join(timeout=5)
+            self.logger.info("🛑 Auto feed scheduler stopped")
+
+class WebAPI:
+    """Enhanced Web API with WebSocket support for Fish Feeder Web App"""
+    
+    def __init__(self, arduino_mgr, firebase_mgr, camera_mgr, feed_history_mgr, config_mgr, logger):
         self.arduino_mgr = arduino_mgr
         self.firebase_mgr = firebase_mgr
         self.camera_mgr = camera_mgr
         self.feed_history_mgr = feed_history_mgr
+        self.config_mgr = config_mgr
         self.logger = logger
         
         self.app = Flask(__name__)
         CORS(self.app)
         
+        # WebSocket Support (NEW)
+        if Config.WEBSOCKET_ENABLED:
+            self.socketio = SocketIO(
+                self.app, 
+                cors_allowed_origins="*",
+                ping_timeout=Config.WEBSOCKET_PING_TIMEOUT,
+                ping_interval=Config.WEBSOCKET_PING_INTERVAL,
+                logger=False,
+                engineio_logger=False
+            )
+            self._setup_websocket_events()
+        else:
+            self.socketio = None
+        
         # Reduce Flask logging
         self.app.logger.setLevel(logging.WARNING)
         
+        # Connected clients (for WebSocket)
+        self.connected_clients = set()
+        
         self._setup_routes()
+    
+    def _setup_websocket_events(self):
+        """Setup WebSocket event handlers"""
+        
+        @self.socketio.on('connect')
+        def handle_connect():
+            self.connected_clients.add(request.sid)
+            self.logger.info(f"🔌 Client connected: {request.sid} (Total: {len(self.connected_clients)})")
+            
+            # Send initial data to new client
+            emit('sensor_data', self._get_realtime_data())
+            emit('system_status', self._get_system_status())
+        
+        @self.socketio.on('disconnect')
+        def handle_disconnect():
+            self.connected_clients.discard(request.sid)
+            self.logger.info(f"🔌 Client disconnected: {request.sid} (Total: {len(self.connected_clients)})")
+        
+        @self.socketio.on('request_sensor_data')
+        def handle_sensor_request():
+            """Handle real-time sensor data request"""
+            emit('sensor_data', self._get_realtime_data())
+        
+        @self.socketio.on('request_system_status')
+        def handle_status_request():
+            """Handle system status request"""
+            emit('system_status', self._get_system_status())
+        
+        @self.socketio.on('feed_command')
+        def handle_feed_command(data):
+            """Handle real-time feed command via WebSocket"""
+            try:
+                result = self._execute_feed_command(data)
+                emit('feed_result', result)
+                
+                # Broadcast to all clients
+                self.broadcast_to_all('feed_update', {
+                    'timestamp': datetime.now().isoformat(),
+                    'action': data.get('action', 'unknown'),
+                    'status': 'success' if result.get('success') else 'error'
+                })
+                
+            except Exception as e:
+                emit('feed_result', {'success': False, 'message': str(e)})
+    
+    def _get_realtime_data(self):
+        """Get current sensor data for real-time updates"""
+        try:
+            sensor_data = self.arduino_mgr.last_data if self.arduino_mgr.last_data else {}
+            
+            # Transform to Web App format
+            transformed_data = {}
+            for sensor_name, measurements in sensor_data.items():
+                if isinstance(measurements, dict):
+                    sensor_values = {}
+                    for measure_type, data in measurements.items():
+                        if isinstance(data, dict) and 'value' in data:
+                            sensor_values[measure_type] = data['value']
+                            if 'unit' in data and measure_type == 'weight':
+                                sensor_values['unit'] = data['unit']
+                    
+                    if sensor_values:
+                        transformed_data[sensor_name] = sensor_values
+            
+            return {
+                'timestamp': datetime.now().isoformat(),
+                'data': transformed_data,
+                'arduino_connected': self.arduino_mgr.is_connected
+            }
+            
+        except Exception as e:
+            self.logger.error(f"❌ Failed to get realtime data: {e}")
+            return {'error': str(e)}
+    
+    def _get_system_status(self):
+        """Get current system status"""
+        return {
+            'timestamp': datetime.now().isoformat(),
+            'arduino_connected': self.arduino_mgr.is_connected,
+            'firebase_connected': self.firebase_mgr.is_connected,
+            'camera_active': self.camera_mgr.is_active,
+            'websocket_enabled': Config.WEBSOCKET_ENABLED,
+            'connected_clients': len(self.connected_clients),
+            'auto_feed_enabled': Config.AUTO_FEED_ENABLED,
+            'uptime_seconds': time.time() - start_time
+        }
+    
+    def _execute_feed_command(self, data):
+        """Execute feed command (used by both HTTP and WebSocket)"""
+        try:
+            action = data.get('action', '').lower()
+            
+            if action in Config.FEED_PRESETS:
+                preset = Config.FEED_PRESETS[action]
+                amount = data.get('amount', preset['amount'])
+                actuator_up = data.get('actuator_up', preset['actuator_up'])
+                actuator_down = data.get('actuator_down', preset['actuator_down'])
+                auger_duration = data.get('auger_duration', data.get('auger_on', preset['auger_duration']))
+                blower_duration = data.get('blower_duration', data.get('blower_on', preset['blower_duration']))
+            elif action == 'custom':
+                amount = data.get('amount', 100)
+                actuator_up = data.get('actuator_up', 3)
+                actuator_down = data.get('actuator_down', 2)
+                auger_duration = data.get('auger_duration', data.get('auger_on', 20))
+                blower_duration = data.get('blower_duration', data.get('blower_on', 15))
+            else:
+                return {'success': False, 'message': 'Invalid action'}
+            
+            # Execute feed sequence
+            success, message = self.arduino_mgr.execute_feed_sequence(
+                amount, actuator_up, actuator_down, auger_duration, blower_duration
+            )
+            
+            if success:
+                # Record feed history
+                device_timings = {
+                    'actuator_up': actuator_up,
+                    'actuator_down': actuator_down,
+                    'auger_duration': auger_duration,
+                    'blower_duration': blower_duration
+                }
+                
+                feed_record = self.feed_history_mgr.add_feed_record(
+                    amount, 'manual', device_timings
+                )
+                
+                return {
+                    'success': True,
+                    'message': 'Feed command executed successfully',
+                    'feed_record': feed_record,
+                    'timestamp': datetime.now().isoformat()
+                }
+            else:
+                return {'success': False, 'message': message}
+                
+        except Exception as e:
+            return {'success': False, 'message': str(e)}
+    
+    def broadcast_to_all(self, event, data):
+        """Broadcast data to all connected WebSocket clients"""
+        if self.socketio and self.connected_clients:
+            self.socketio.emit(event, data)
+    
+    def broadcast_sensor_update(self):
+        """Broadcast sensor updates to all clients"""
+        if self.socketio and self.connected_clients:
+            realtime_data = self._get_realtime_data()
+            self.socketio.emit('sensor_data', realtime_data)
+    
+    def broadcast_system_status(self):
+        """Broadcast system status to all clients"""
+        if self.socketio and self.connected_clients:
+            status = self._get_system_status()
+            self.socketio.emit('system_status', status)
     
     def _setup_routes(self):
         """Setup API routes"""
@@ -692,30 +1058,28 @@ class WebAPI:
                 else:
                     sensor_data = self.arduino_mgr.last_data
                 
-                # Transform sensor data to Web App format
+                # Transform sensor data to Web App format (SIMPLIFIED)
                 transformed_data = {}
                 current_time = datetime.now().isoformat()
                 
                 for sensor_name, measurements in sensor_data.items():
                     if isinstance(measurements, dict):
-                        transformed_data[sensor_name] = {
-                            'timestamp': current_time,
-                            'values': []
-                        }
+                        # Web App expected format - flatten the structure
+                        sensor_values = {}
                         
                         for measure_type, data in measurements.items():
                             if isinstance(data, dict) and 'value' in data:
-                                transformed_data[sensor_name]['values'].append({
-                                    'type': measure_type,
-                                    'value': data['value'],
-                                    'unit': data.get('unit', ''),
-                                    'timestamp': data.get('timestamp', current_time)
-                                })
+                                sensor_values[measure_type] = data['value']
+                                # Add unit if available
+                                if 'unit' in data and measure_type == 'weight':
+                                    sensor_values['unit'] = data['unit']
+                        
+                        if sensor_values:
+                            transformed_data[sensor_name] = sensor_values
                 
                 return jsonify({
-                    'status': 'success',
                     'timestamp': current_time,
-                    'data': transformed_data,
+                    **transformed_data,  # Flatten structure for Web App compatibility
                     'arduino_connected': self.arduino_mgr.is_connected
                 })
                 
@@ -757,20 +1121,23 @@ class WebAPI:
                 data = request.get_json() or {}
                 action = data.get('action', '').lower()
                 
-                # Get timing parameters
+                # Get timing parameters - Handle both Web App and Pi Server naming
                 if action in Config.FEED_PRESETS:
                     preset = Config.FEED_PRESETS[action]
                     amount = data.get('amount', preset['amount'])
                     actuator_up = data.get('actuator_up', preset['actuator_up'])
                     actuator_down = data.get('actuator_down', preset['actuator_down'])
-                    auger_duration = data.get('auger_duration', preset['auger_duration'])
-                    blower_duration = data.get('blower_duration', preset['blower_duration'])
+                    # Handle both auger_on (Web App) and auger_duration (Pi Server)
+                    auger_duration = data.get('auger_duration', data.get('auger_on', preset['auger_duration']))
+                    # Handle both blower_on (Web App) and blower_duration (Pi Server)
+                    blower_duration = data.get('blower_duration', data.get('blower_on', preset['blower_duration']))
                 elif action == 'custom':
                     amount = data.get('amount', 100)
                     actuator_up = data.get('actuator_up', 3)
                     actuator_down = data.get('actuator_down', 2)
-                    auger_duration = data.get('auger_duration', 20)
-                    blower_duration = data.get('blower_duration', 15)
+                    # Handle both naming conventions
+                    auger_duration = data.get('auger_duration', data.get('auger_on', 20))
+                    blower_duration = data.get('blower_duration', data.get('blower_on', 15))
                 else:
                     return jsonify({'status': 'error', 'message': 'Invalid action'}), 400
                 
@@ -927,43 +1294,319 @@ class WebAPI:
                     
             except Exception as e:
                 return jsonify({'success': False, 'message': str(e)}), 500
+        
+        # Additional Web App Compatible Endpoints
+        @self.app.route('/api/control/blower', methods=['POST'])
+        def control_blower():
+            """Blower control endpoint for Web App compatibility"""
+            try:
+                data = request.get_json() or {}
+                action = data.get('action', '').lower()
+                value = data.get('value', 1)
+                
+                if action == 'on':
+                    command = f"B:{value}"
+                elif action == 'off':
+                    command = "B:0"
+                else:
+                    return jsonify({'status': 'error', 'message': 'Invalid action'}), 400
+                
+                success = self.arduino_mgr.send_command(command)
+                return jsonify({
+                    'status': 'success' if success else 'error',
+                    'action': action,
+                    'command': command,
+                    'timestamp': datetime.now().isoformat()
+                })
+            except Exception as e:
+                return jsonify({'status': 'error', 'message': str(e)}), 500
+        
+        @self.app.route('/api/control/actuator', methods=['POST'])
+        def control_actuator():
+            """Actuator control endpoint for Web App compatibility"""
+            try:
+                data = request.get_json() or {}
+                action = data.get('action', '').lower()
+                duration = data.get('duration', 3.0)
+                
+                if action == 'up':
+                    command = f"U:{duration}"
+                elif action == 'down':
+                    command = f"D:{duration}"
+                else:
+                    return jsonify({'status': 'error', 'message': 'Invalid action'}), 400
+                
+                success = self.arduino_mgr.send_command(command)
+                return jsonify({
+                    'status': 'success' if success else 'error',
+                    'action': action,
+                    'command': command,
+                    'timestamp': datetime.now().isoformat()
+                })
+            except Exception as e:
+                return jsonify({'status': 'error', 'message': str(e)}), 500
+        
+        @self.app.route('/api/control/weight/calibrate', methods=['POST'])
+        def calibrate_weight():
+            """HX711 Weight calibration endpoint"""
+            try:
+                data = request.get_json() or {}
+                known_weight = data.get('known_weight', 1000)  # grams
+                
+                # First set calibration mode
+                mode_success = self.arduino_mgr.send_command("HX:CALIBRATION")
+                
+                if mode_success:
+                    # Send calibration weight (convert grams to kg for Arduino)
+                    weight_kg = known_weight / 1000.0
+                    command = f"CAL:WEIGHT:{weight_kg:.3f}"
+                    cal_success = self.arduino_mgr.send_command(command)
+                    
+                    if cal_success:
+                        # Switch back to auto mode
+                        auto_success = self.arduino_mgr.send_command("HX:AUTO")
+                        
+                        return jsonify({
+                            'status': 'success',
+                            'message': f'HX711 calibration completed with {weight_kg:.3f} kg',
+                            'known_weight_grams': known_weight,
+                            'known_weight_kg': weight_kg,
+                            'auto_mode_restored': auto_success,
+                            'timestamp': datetime.now().isoformat()
+                        })
+                    else:
+                        return jsonify({
+                            'status': 'error',
+                            'message': 'Failed to send calibration weight',
+                            'timestamp': datetime.now().isoformat()
+                        }), 500
+                else:
+                    return jsonify({
+                        'status': 'error',
+                        'message': 'Failed to enter calibration mode',
+                        'timestamp': datetime.now().isoformat()
+                    }), 500
+                    
+            except Exception as e:
+                return jsonify({'status': 'error', 'message': str(e)}), 500
+        
+        @self.app.route('/api/control/weight/tare', methods=['POST'])
+        def tare_weight():
+            """Weight tare (zero) endpoint"""
+            try:
+                success = self.arduino_mgr.send_command("CAL:TARE")
+                return jsonify({
+                    'status': 'success' if success else 'error',
+                    'message': f'Tare {"completed" if success else "failed"}',
+                    'timestamp': datetime.now().isoformat()
+                })
+            except Exception as e:
+                return jsonify({'status': 'error', 'message': str(e)}), 500
+        
+        @self.app.route('/api/control/weight/reset', methods=['POST'])
+        def reset_weight_calibration():
+            """Reset weight calibration data from EEPROM"""
+            try:
+                success = self.arduino_mgr.send_command("CAL:RESET")
+                return jsonify({
+                    'status': 'success' if success else 'error',
+                    'message': f'Calibration reset {"completed" if success else "failed"}',
+                    'timestamp': datetime.now().isoformat()
+                })
+            except Exception as e:
+                return jsonify({'status': 'error', 'message': str(e)}), 500
+        
+        @self.app.route('/api/control/config', methods=['GET', 'POST'])
+        def control_config():
+            """Enhanced configuration endpoint with real-time updates"""
+            try:
+                if request.method == 'GET':
+                    # Return comprehensive configuration
+                    config = self.config_mgr.get_current_config()
+                    config['system_status'] = self._get_system_status()
+                    return jsonify(config)
+                
+                elif request.method == 'POST':
+                    # Update configuration dynamically
+                    data = request.get_json() or {}
+                    
+                    success = self.config_mgr.update_config(data)
+                    
+                    if success:
+                        # Broadcast config update to WebSocket clients
+                        self.broadcast_to_all('config_updated', {
+                            'timestamp': datetime.now().isoformat(),
+                            'new_config': self.config_mgr.get_current_config()
+                        })
+                        
+                        return jsonify({
+                            'status': 'success',
+                            'message': 'Configuration updated successfully',
+                            'timestamp': datetime.now().isoformat()
+                        })
+                    else:
+                        return jsonify({
+                            'status': 'error',
+                            'message': 'Failed to update configuration'
+                        }), 500
+                    
+            except Exception as e:
+                return jsonify({'status': 'error', 'message': str(e)}), 500
+        
+        # WebSocket Status Endpoint (NEW)
+        @self.app.route('/api/websocket/status', methods=['GET'])
+        def websocket_status():
+            """Get WebSocket connection status"""
+            return jsonify({
+                'websocket_enabled': Config.WEBSOCKET_ENABLED,
+                'connected_clients': len(self.connected_clients),
+                'ping_timeout': Config.WEBSOCKET_PING_TIMEOUT,
+                'ping_interval': Config.WEBSOCKET_PING_INTERVAL,
+                'broadcast_interval': Config.WEBSOCKET_BROADCAST_INTERVAL,
+                'timestamp': datetime.now().isoformat()
+            })
+        
+        # Auto Feed Control Endpoints (NEW)
+        @self.app.route('/api/auto-feed/start', methods=['POST'])
+        def start_auto_feed():
+            """Start automatic feeding scheduler"""
+            try:
+                Config.AUTO_FEED_ENABLED = True
+                Config.save_to_file()
+                
+                self.config_mgr.start_auto_feed_scheduler(
+                    self.arduino_mgr, self.feed_history_mgr
+                )
+                
+                # Broadcast to WebSocket clients
+                self.broadcast_to_all('auto_feed_status', {
+                    'enabled': True,
+                    'schedule': Config.AUTO_FEED_SCHEDULE,
+                    'timestamp': datetime.now().isoformat()
+                })
+                
+                return jsonify({
+                    'status': 'success',
+                    'message': 'Auto feed scheduler started',
+                    'schedule': Config.AUTO_FEED_SCHEDULE
+                })
+                
+            except Exception as e:
+                return jsonify({'status': 'error', 'message': str(e)}), 500
+        
+        @self.app.route('/api/auto-feed/stop', methods=['POST'])
+        def stop_auto_feed():
+            """Stop automatic feeding scheduler"""
+            try:
+                Config.AUTO_FEED_ENABLED = False
+                Config.save_to_file()
+                
+                self.config_mgr.stop_auto_feed_scheduler()
+                
+                # Broadcast to WebSocket clients
+                self.broadcast_to_all('auto_feed_status', {
+                    'enabled': False,
+                    'timestamp': datetime.now().isoformat()
+                })
+                
+                return jsonify({
+                    'status': 'success',
+                    'message': 'Auto feed scheduler stopped'
+                })
+                
+            except Exception as e:
+                return jsonify({'status': 'error', 'message': str(e)}), 500
+        
+        @self.app.route('/api/auto-feed/schedule', methods=['GET', 'POST'])
+        def auto_feed_schedule():
+            """Get or update auto feed schedule"""
+            try:
+                if request.method == 'GET':
+                    return jsonify({
+                        'enabled': Config.AUTO_FEED_ENABLED,
+                        'schedule': Config.AUTO_FEED_SCHEDULE
+                    })
+                
+                elif request.method == 'POST':
+                    data = request.get_json() or {}
+                    
+                    if 'schedule' in data:
+                        Config.AUTO_FEED_SCHEDULE = data['schedule']
+                        Config.save_to_file()
+                        
+                        # Broadcast update
+                        self.broadcast_to_all('auto_feed_schedule_updated', {
+                            'schedule': Config.AUTO_FEED_SCHEDULE,
+                            'timestamp': datetime.now().isoformat()
+                        })
+                        
+                        return jsonify({
+                            'status': 'success',
+                            'message': 'Auto feed schedule updated',
+                            'schedule': Config.AUTO_FEED_SCHEDULE
+                        })
+                    
+                    return jsonify({'status': 'error', 'message': 'No schedule provided'}), 400
+                    
+            except Exception as e:
+                return jsonify({'status': 'error', 'message': str(e)}), 500
     
     def run(self):
-        """Start web server"""
-        self.logger.info(f"🌐 Starting web server at http://{Config.WEB_HOST}:{Config.WEB_PORT}")
-        self.app.run(
-            host=Config.WEB_HOST,
-            port=Config.WEB_PORT,
-            debug=Config.WEB_DEBUG,
-            threaded=True,
-            use_reloader=False
-        )
+        """Start web server with WebSocket support"""
+        self.logger.info(f"🌐 Starting enhanced web server at http://{Config.WEB_HOST}:{Config.WEB_PORT}")
+        
+        if self.socketio:
+            self.logger.info(f"🔌 WebSocket enabled - Real-time updates active")
+            # Start WebSocket server
+            self.socketio.run(
+                self.app,
+                host=Config.WEB_HOST,
+                port=Config.WEB_PORT,
+                debug=Config.WEB_DEBUG,
+                use_reloader=False,
+                allow_unsafe_werkzeug=True
+            )
+        else:
+            self.logger.info(f"📡 Standard HTTP server only")
+            # Start regular Flask server
+            self.app.run(
+                host=Config.WEB_HOST,
+                port=Config.WEB_PORT,
+                debug=Config.WEB_DEBUG,
+                threaded=True,
+                use_reloader=False
+            )
 
 # ==============================================================================
 # MAIN CONTROLLER
 # ==============================================================================
 
 class FishFeederController:
-    """Main system controller"""
+    """Main system controller with enhanced real-time features"""
     
     def __init__(self):
         self.logger = setup_logging()
         self.running = True
+        
+        # Load configuration from file
+        Config.load_from_file()
         
         # Initialize managers
         self.arduino_mgr = ArduinoManager(self.logger)
         self.firebase_mgr = FirebaseManager(self.logger)
         self.camera_mgr = CameraManager(self.logger)
         self.feed_history_mgr = FeedHistoryManager(self.logger)
+        self.config_mgr = ConfigurationManager(self.logger)  # NEW
         self.web_api = WebAPI(
             self.arduino_mgr, self.firebase_mgr, self.camera_mgr, 
-            self.feed_history_mgr, self.logger
+            self.feed_history_mgr, self.config_mgr, self.logger  # Updated
         )
         
         # Timing
         self.last_sensor_read = 0
         self.last_firebase_sync = 0
         self.last_status_broadcast = 0
+        self.last_websocket_broadcast = 0  # NEW
         
         # Signal handlers
         signal.signal(signal.SIGINT, self._signal_handler)
@@ -976,7 +1619,7 @@ class FishFeederController:
     
     def initialize(self):
         """Initialize system"""
-        self.logger.info("🚀 Initializing Fish Feeder Controller v3.0...")
+        self.logger.info("🚀 Initializing Fish Feeder Controller v3.1...")
         
         # Initialize Firebase (optional)
         if not self.firebase_mgr.initialize():
@@ -991,6 +1634,10 @@ class FishFeederController:
         # Try Arduino connection (will retry automatically)
         if not self.arduino_mgr.connect():
             self.logger.warning("⚠️ Arduino not connected, will retry automatically")
+        
+        # Start auto feed scheduler if enabled
+        if Config.AUTO_FEED_ENABLED:
+            self.config_mgr.start_auto_feed_scheduler(self.arduino_mgr, self.feed_history_mgr)
         
         self.logger.info("✅ System initialization completed")
         return True
@@ -1040,6 +1687,12 @@ class FishFeederController:
                     if current_time - self.last_status_broadcast > Config.STATUS_BROADCAST_INTERVAL:
                         self._broadcast_status()
                         self.last_status_broadcast = current_time
+                    
+                    # WebSocket broadcast (NEW)
+                    if (Config.WEBSOCKET_ENABLED and 
+                        current_time - self.last_websocket_broadcast > Config.WEBSOCKET_BROADCAST_INTERVAL):
+                        self._broadcast_websocket_updates()
+                        self.last_websocket_broadcast = current_time
                     
                     time.sleep(1)
                     
@@ -1103,6 +1756,12 @@ class FishFeederController:
                         f"Camera={self.camera_mgr.is_active}, "
                         f"Sensors={len(self.arduino_mgr.last_data)}")
     
+    def _broadcast_websocket_updates(self):
+        """Broadcast WebSocket updates"""
+        self.logger.info("📡 Broadcasting WebSocket updates")
+        self.web_api.broadcast_sensor_update()
+        self.web_api.broadcast_system_status()
+    
     def run(self):
         """Run main system"""
         try:
@@ -1123,26 +1782,40 @@ class FishFeederController:
         return True
     
     def shutdown(self):
-        """Graceful shutdown"""
-        self.logger.info("🔄 Shutting down...")
-        self.running = False
+        """Graceful shutdown with WebSocket cleanup"""
+        self.logger.info("🛑 Shutting down Fish Feeder Controller...")
         
-        if self.arduino_mgr:
-            self.arduino_mgr.disconnect()
-        
-        if self.camera_mgr:
-            self.camera_mgr.shutdown()
-        
-        if self.firebase_mgr and self.firebase_mgr.is_connected:
-            try:
-                self.firebase_mgr.db_ref.child('status').update({
-                    'online': False,
-                    'last_shutdown': datetime.now().isoformat()
+        try:
+            # Stop auto feed scheduler
+            if hasattr(self.config_mgr, 'stop_auto_feed_scheduler'):
+                self.config_mgr.stop_auto_feed_scheduler()
+            
+            # Disconnect WebSocket clients
+            if hasattr(self.web_api, 'socketio') and self.web_api.socketio:
+                self.web_api.socketio.emit('system_shutdown', {
+                    'message': 'Server is shutting down',
+                    'timestamp': datetime.now().isoformat()
                 })
-            except:
-                pass
+                time.sleep(1)  # Give time for message to send
+            
+            # Disconnect hardware
+            if self.arduino_mgr:
+                self.arduino_mgr.disconnect()
+            
+            # Shutdown camera
+            if self.camera_mgr:
+                self.camera_mgr.shutdown()
+            
+            # Save final configuration
+            Config.save_to_file()
+            
+            self.logger.info("✅ Graceful shutdown completed")
+            
+        except Exception as e:
+            self.logger.error(f"❌ Error during shutdown: {e}")
         
-        self.logger.info("✅ Shutdown completed")
+        finally:
+            self.running = False
 
 # ==============================================================================
 # ENTRY POINT
@@ -1151,12 +1824,41 @@ class FishFeederController:
 start_time = time.time()
 
 def main():
-    """Main entry point"""
-    print("🐟 Fish Feeder Pi Controller v3.0")
-    print("==================================")
+    """Main function"""
+    global start_time
+    start_time = time.time()
+    
+    print("="*60)
+    print("🐟 FISH FEEDER Pi CONTROLLER v3.1")
+    print("="*60)
+    print("✨ Real-time WebSocket Support")
+    print("🔧 Advanced Configuration Management") 
+    print("🤖 Automatic Feed Scheduling")
+    print("📱 Web App Integration Ready")
+    print("="*60)
     
     controller = FishFeederController()
-    return controller.run()
+    
+    try:
+        if not controller.initialize():
+            print("❌ Failed to initialize system")
+            return 1
+        
+        # Start background tasks
+        controller.start_background_tasks()
+        
+        # Start web server
+        controller.run()
+        
+    except KeyboardInterrupt:
+        print("\n🛑 Received interrupt signal")
+    except Exception as e:
+        controller.logger.error(f"❌ Fatal error: {e}")
+        traceback.print_exc()
+    finally:
+        controller.shutdown()
+        
+    return 0
 
 if __name__ == "__main__":
-    sys.exit(0 if main() else 1) 
+    exit(main()) 

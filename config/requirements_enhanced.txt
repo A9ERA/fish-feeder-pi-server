@@ -1,0 +1,26 @@
+# 🐟 Fish Feeder Arduino + Pi Controller - Enhanced Dependencies
+# Original dependencies
+flask==2.3.3
+flask-cors==4.0.0
+flask-socketio==5.3.6
+python-socketio==5.9.0
+pyserial==3.5
+firebase-admin==6.2.0
+opencv-python==4.8.1.78
+pathlib2==2.3.7
+
+# 🚀 Smart Hybrid Storage Dependencies
+google-auth==2.23.4
+google-auth-oauthlib==1.1.0
+google-auth-httplib2==0.1.1
+google-api-python-client==2.103.0
+google-cloud-storage==2.10.0
+
+# 🌐 PageKite Tunneling
+pagekite==1.5.2.201227
+
+# 📊 Additional utilities
+psutil==5.9.5        # System monitoring
+schedule==1.2.0       # Task scheduling
+python-dotenv==1.0.0  # Environment variables
+requests==2.31.0      # HTTP requests 
