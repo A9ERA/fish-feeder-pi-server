@@ -3,7 +3,7 @@
 🐟 FISH FEEDER Pi CONTROLLER v3.1
 =================================
 Complete Pi Controller for Arduino-based Fish Feeding System with Web App Integration
-+ Real-time WebSocket Support + Advanced Configuration Management
++ Real-time WebSocket Support + Advanced Configuration Management + Sensor History Analytics
 """
 
 import sys, json, time, logging, threading, traceback, signal, os, re
@@ -28,6 +28,9 @@ from firebase_admin import credentials, db
 # Camera
 import cv2
 import threading
+
+# Sensor History Manager
+from sensor_history_manager import SensorHistoryManager
 
 # ==============================================================================
 # CONFIGURATION
@@ -395,41 +398,109 @@ class ArduinoManager:
             self.logger.error(f"❌ Feed sequence failed: {e}")
             return False, str(e)
     
-    def read_sensors(self):
+        def read_sensors(self):
         """Read sensor data from Arduino"""
         if not self.is_connected or not self.serial_conn:
             return {}
-        
+
         try:
             with self.lock:
                 self.serial_conn.reset_input_buffer()
                 self.serial_conn.write(b"S:ALL\n")
                 self.serial_conn.flush()
-                
+
                 start_time = time.time()
                 sensor_data = {}
-                
+
                 while time.time() - start_time < 3:
                     if self.serial_conn.in_waiting > 0:
                         line = self.serial_conn.readline().decode().strip()
-                        
+
                         if line:
                             parsed = self._parse_sensor_line(line)
                             if parsed:
                                 sensor_data.update(parsed)
-                    
+
                     time.sleep(0.1)
-                
+
                 if sensor_data:
                     self.last_data = sensor_data
                     return sensor_data
                 else:
                     return self.last_data
-                    
+
         except Exception as e:
             self.logger.error(f"❌ Failed to read sensors: {e}")
             self.is_connected = False
             return self.last_data
+    
+    def _enhance_battery_data(self, measurements):
+        """Enhance battery data with Li-ion 12V 12AH calculations"""
+        try:
+            # Get basic measurements
+            voltage = measurements.get('voltage', {}).get('value', 0)
+            current = measurements.get('current', {}).get('value', 0)
+            
+            if voltage > 0:
+                # Calculate Li-ion State of Charge (SOC)
+                if voltage >= 12.5:
+                    soc = 100.0
+                elif voltage >= 12.2:
+                    soc = 85.0 + ((voltage - 12.2) / 0.3) * 15.0
+                elif voltage >= 11.8:
+                    soc = 60.0 + ((voltage - 11.8) / 0.4) * 25.0
+                elif voltage >= 11.4:
+                    soc = 30.0 + ((voltage - 11.4) / 0.4) * 30.0
+                elif voltage >= 10.8:
+                    soc = 10.0 + ((voltage - 10.8) / 0.6) * 20.0
+                elif voltage >= 8.4:
+                    soc = ((voltage - 8.4) / 2.4) * 10.0
+                else:
+                    soc = 0.0
+                
+                # Battery health status
+                if voltage < 8.4:
+                    health_status = "CRITICAL"
+                elif voltage < 10.8:
+                    health_status = "LOW"
+                elif voltage < 11.4:
+                    health_status = "FAIR"
+                elif voltage < 12.2:
+                    health_status = "GOOD"
+                elif voltage <= 12.6:
+                    health_status = "EXCELLENT"
+                else:
+                    health_status = "OVERCHARGE"
+                
+                # Calculate power and efficiency
+                power = voltage * current if current > 0 else 0
+                
+                # Li-ion efficiency based on discharge rate
+                if current < 1.0:
+                    efficiency = 95.0
+                elif current < 5.0:
+                    efficiency = 92.0
+                elif current < 15.0:
+                    efficiency = 88.0
+                else:
+                    efficiency = 85.0
+                
+                # Estimated runtime (12AH battery)
+                available_capacity = 12.0 * (soc / 100.0)
+                runtime = available_capacity / current if current > 0.01 else 999.0
+                
+                # Add enhanced data
+                measurements['soc'] = {'value': round(soc, 1), 'unit': '%', 'timestamp': datetime.now().isoformat()}
+                measurements['health_status'] = {'value': health_status, 'unit': '', 'timestamp': datetime.now().isoformat()}
+                measurements['power'] = {'value': round(power, 2), 'unit': 'W', 'timestamp': datetime.now().isoformat()}
+                measurements['efficiency'] = {'value': round(efficiency, 1), 'unit': '%', 'timestamp': datetime.now().isoformat()}
+                measurements['runtime'] = {'value': round(min(runtime, 999), 1), 'unit': 'h', 'timestamp': datetime.now().isoformat()}
+                measurements['battery_type'] = {'value': 'Li-ion 12V 12AH', 'unit': '', 'timestamp': datetime.now().isoformat()}
+                
+                self.logger.debug(f"🔋 Enhanced battery data: {soc:.1f}% SOC, {health_status} health")
+                
+        except Exception as e:
+            self.logger.error(f"❌ Failed to enhance battery data: {e}")
     
     def _parse_sensor_line(self, line):
         """Parse sensor data line"""
@@ -438,35 +509,39 @@ class ArduinoManager:
             if line.startswith('[SEND] - {') and line.endswith('}'):
                 json_str = line[9:]  # Remove "[SEND] - " prefix
                 data = json.loads(json_str)
-                
+
                 sensor_name = data.get('name', '')
                 values = data.get('value', [])
-                
+
                 if not sensor_name or not values:
                     return None
-                
+
                 measurements = {}
                 for item in values:
                     measurement_type = item.get('type', 'value')
                     value = item.get('value', 0)
                     unit = item.get('unit', '')
                     timestamp = item.get('timestamp', datetime.now().isoformat())
-                    
+
                     # Convert special types
                     if measurement_type == 'charging' and isinstance(value, str):
                         value = value.lower() == 'true'
                     elif measurement_type != 'charging':
                         try:
                             value = float(value)
-                        except:
+                        except (ValueError, TypeError):
                             value = 0
-                    
+
                     measurements[measurement_type] = {
                         'value': value,
                         'unit': unit,
                         'timestamp': timestamp
                     }
-                
+
+                # Enhanced battery processing for Li-ion 12V 12AH
+                if sensor_name in ['BATTERY_STATUS', 'POWER_MANAGEMENT']:
+                    self._enhance_battery_data(measurements)
+
                 return {sensor_name: measurements} if measurements else None
             
             # Legacy Format: "SENSOR_NAME:type=value unit" (keep for compatibility)
@@ -494,7 +569,7 @@ class ArduinoManager:
                             }
                             
                             i += 2 if unit else 1
-                        except:
+                        except (ValueError, TypeError):
                             i += 1
                     else:
                         i += 1
@@ -842,16 +917,22 @@ class ConfigurationManager:
 class WebAPI:
     """Enhanced Web API with WebSocket support for Fish Feeder Web App"""
     
-    def __init__(self, arduino_mgr, firebase_mgr, camera_mgr, feed_history_mgr, config_mgr, logger):
+    def __init__(self, arduino_mgr, firebase_mgr, camera_mgr, feed_history_mgr, config_mgr, sensor_history_mgr, logger):
         self.arduino_mgr = arduino_mgr
         self.firebase_mgr = firebase_mgr
         self.camera_mgr = camera_mgr
         self.feed_history_mgr = feed_history_mgr
+        self.sensor_history_mgr = sensor_history_mgr
         self.config_mgr = config_mgr
         self.logger = logger
         
         self.app = Flask(__name__)
-        CORS(self.app)
+        CORS(self.app, origins=[
+            "http://localhost:3000",
+            "http://localhost:5173", 
+            "https://fish-feeder-test-1.web.app",
+            "https://fish-feeder-test-1.firebaseapp.com"
+        ])
         
         # WebSocket Support (NEW)
         if Config.WEBSOCKET_ENABLED:
@@ -1550,6 +1631,176 @@ class WebAPI:
                     
             except Exception as e:
                 return jsonify({'status': 'error', 'message': str(e)}), 500
+        
+        # ==============================================================================
+        # SENSOR HISTORY & ANALYTICS API ENDPOINTS
+        # ==============================================================================
+        
+        @self.app.route('/api/sensors/history', methods=['GET'])
+        def get_sensor_history():
+            """Get historical sensor data for charts"""
+            try:
+                # Get query parameters
+                start_date = request.args.get('start_date')
+                end_date = request.args.get('end_date')
+                sensors = request.args.getlist('sensors')  # Multiple sensors
+                resolution = request.args.get('resolution', 'raw')  # raw, hourly, daily, monthly
+                limit = int(request.args.get('limit', 200))  # Performance limit
+                
+                # Default to last 7 days if no dates provided
+                if not start_date or not end_date:
+                    end_date_obj = datetime.now()
+                    start_date_obj = end_date_obj - timedelta(days=7)
+                    start_date = start_date_obj.strftime('%Y-%m-%d')
+                    end_date = end_date_obj.strftime('%Y-%m-%d')
+                
+                # Get historical data
+                data = self.sensor_history_mgr.get_historical_data(
+                    start_date, end_date, sensors, resolution
+                )
+                
+                # Limit data for performance
+                if len(data) > limit:
+                    # Sample data evenly
+                    step = len(data) // limit
+                    data = data[::step][:limit]
+                
+                return jsonify({
+                    'status': 'success',
+                    'data': data,
+                    'metadata': {
+                        'start_date': start_date,
+                        'end_date': end_date,
+                        'sensors': sensors,
+                        'resolution': resolution,
+                        'total_records': len(data),
+                        'limit_applied': len(data) >= limit
+                    }
+                })
+                
+            except Exception as e:
+                self.logger.error(f"❌ Sensor history error: {e}")
+                return jsonify({'status': 'error', 'message': str(e)}), 500
+        
+        @self.app.route('/api/sensors/live', methods=['GET'])
+        def get_live_sensor_data():
+            """Get recent live sensor data for real-time charts"""
+            try:
+                limit = int(request.args.get('limit', 100))
+                
+                # Get live data from memory buffer
+                live_data = self.sensor_history_mgr.get_live_data(limit)
+                
+                return jsonify({
+                    'status': 'success',
+                    'data': live_data,
+                    'metadata': {
+                        'total_records': len(live_data),
+                        'real_time': True,
+                        'update_interval': Config.SENSOR_READ_INTERVAL
+                    }
+                })
+                
+            except Exception as e:
+                self.logger.error(f"❌ Live sensor data error: {e}")
+                return jsonify({'status': 'error', 'message': str(e)}), 500
+        
+        @self.app.route('/api/analytics/energy', methods=['GET'])
+        def get_energy_analytics():
+            """Get comprehensive energy analytics and recommendations"""
+            try:
+                days = int(request.args.get('days', 7))  # Default 7 days
+                
+                # Get energy analytics
+                analytics = self.sensor_history_mgr.get_energy_analytics(days)
+                
+                return jsonify({
+                    'status': 'success',
+                    'analytics': analytics,
+                    'generated_at': datetime.now().isoformat()
+                })
+                
+            except Exception as e:
+                self.logger.error(f"❌ Energy analytics error: {e}")
+                return jsonify({'status': 'error', 'message': str(e)}), 500
+        
+        @self.app.route('/api/sensors/summary', methods=['GET'])
+        def get_sensor_summary():
+            """Get summary of all sensor types and latest values"""
+            try:
+                summary = self.sensor_history_mgr.get_sensor_summary()
+                
+                return jsonify({
+                    'status': 'success',
+                    'summary': summary
+                })
+                
+            except Exception as e:
+                self.logger.error(f"❌ Sensor summary error: {e}")
+                return jsonify({'status': 'error', 'message': str(e)}), 500
+        
+        @self.app.route('/api/storage/info', methods=['GET'])
+        def get_storage_info():
+            """Get NoSQL storage usage information"""
+            try:
+                storage_info = self.sensor_history_mgr.get_storage_info()
+                
+                return jsonify({
+                    'status': 'success',
+                    'storage': storage_info
+                })
+                
+            except Exception as e:
+                self.logger.error(f"❌ Storage info error: {e}")
+                return jsonify({'status': 'error', 'message': str(e)}), 500
+        
+        @self.app.route('/api/sensors/export', methods=['POST'])
+        def export_sensor_data():
+            """Export historical sensor data"""
+            try:
+                data = request.get_json() or {}
+                start_date = data.get('start_date')
+                end_date = data.get('end_date')
+                format_type = data.get('format', 'json')  # json or csv
+                
+                if not start_date or not end_date:
+                    return jsonify({'status': 'error', 'message': 'start_date and end_date required'}), 400
+                
+                # Export data
+                export_file = self.sensor_history_mgr.export_data(start_date, end_date, format_type)
+                
+                if export_file:
+                    return jsonify({
+                        'status': 'success',
+                        'message': 'Data exported successfully',
+                        'file_path': export_file
+                    })
+                else:
+                    return jsonify({'status': 'error', 'message': 'Export failed'}), 500
+                    
+            except Exception as e:
+                self.logger.error(f"❌ Export error: {e}")
+                return jsonify({'status': 'error', 'message': str(e)}), 500
+        
+        @self.app.route('/api/storage/cleanup', methods=['POST'])
+        def cleanup_old_data():
+            """Clean up old sensor data based on retention policies"""
+            try:
+                # Run cleanup
+                self.sensor_history_mgr.cleanup_old_data()
+                
+                # Get updated storage info
+                storage_info = self.sensor_history_mgr.get_storage_info()
+                
+                return jsonify({
+                    'status': 'success',
+                    'message': 'Data cleanup completed',
+                    'storage': storage_info
+                })
+                
+            except Exception as e:
+                self.logger.error(f"❌ Cleanup error: {e}")
+                return jsonify({'status': 'error', 'message': str(e)}), 500
     
     def run(self):
         """Start web server with WebSocket support"""
@@ -1597,9 +1848,10 @@ class FishFeederController:
         self.camera_mgr = CameraManager(self.logger)
         self.feed_history_mgr = FeedHistoryManager(self.logger)
         self.config_mgr = ConfigurationManager(self.logger)  # NEW
+        self.sensor_history_mgr = SensorHistoryManager(self.logger)  # NEW - NoSQL Data Storage
         self.web_api = WebAPI(
             self.arduino_mgr, self.firebase_mgr, self.camera_mgr, 
-            self.feed_history_mgr, self.config_mgr, self.logger  # Updated
+            self.feed_history_mgr, self.config_mgr, self.sensor_history_mgr, self.logger  # Updated
         )
         
         # Timing
@@ -1665,6 +1917,9 @@ class FishFeederController:
                             
                             # Log sensor data to daily file
                             self._log_sensor_data(sensor_data)
+                            
+                            # Save to NoSQL sensor history
+                            self.sensor_history_mgr.save_sensor_data(sensor_data)
                     
                     # Firebase sync (if connected)
                     if (self.firebase_mgr.is_connected and 
