@@ -1,430 +1,339 @@
-# 🐟 Fish Feeder Pi Server - 100% PRODUCTION READY
+# 🐟 Fish Feeder Pi Controller - Complete IoT System
 
-<div align="center">
+[![Python](https://img.shields.io/badge/Python-3.8%2B-blue)](https://python.org)
+[![Flask](https://img.shields.io/badge/Flask-2.3.3-green)](https://flask.palletsprojects.com)
+[![Firebase](https://img.shields.io/badge/Firebase-Realtime%20DB-orange)](https://firebase.google.com)
+[![Arduino](https://img.shields.io/badge/Arduino-Compatible-red)](https://arduino.cc)
+[![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
-![Version](https://img.shields.io/badge/version-3.1.0%20COMPLETE-brightgreen.svg)
-![Platform](https://img.shields.io/badge/platform-Raspberry%20Pi-red.svg)
-![Python](https://img.shields.io/badge/python-3.7+-green.svg)
-![Status](https://img.shields.io/badge/status-100%25%20PRODUCTION%20READY-brightgreen.svg)
+> **Advanced Raspberry Pi controller for Arduino-based automated fish feeding system with real-time monitoring, IoT integration, and comprehensive sensor analytics.**
 
-**🎯 Complete IoT Pi Server for Fish Feeder System - All Features Operational**
+## 🚀 **What's New in This Version**
 
-[🚀 Quick Start](#-quick-start) • [📖 Documentation](#-documentation) • [🌐 Demo](#-demo-urls) • [🔧 API](#-api-reference)
+### ✅ **Enhanced Sensor Data Parsing**
+- **Complete sensor coverage** - All Arduino sensors now properly parsed
+- **Standardized data format** - Consistent value/unit/timestamp structure
+- **Temperature & Humidity** - DHT22 sensors fully supported
+- **System Health Monitoring** - Real-time status validation
 
-</div>
-
----
-
-## 🌟 100% Complete Features
-
-<table>
-<tr>
-<td width="50%">
-
-### 🎬 **Video Recording System**
-- ✅ Auto-record ขณะให้อาหาร
-- ✅ MP4 format พร้อม timestamp  
-- ✅ Mobile-friendly playback
-- ✅ Real-time streaming to web app
-
-</td>
-<td width="50%">
-
-### ☁️ **Hybrid Cloud Storage**
-- ✅ Pi Local: 128GB optimized
-- ✅ Firebase: 5GB (instant sync)
-- ✅ Google Drive: 200GB archive
-- ✅ **Total: 333GB capacity!**
-
-</td>
-</tr>
-<tr>
-<td>
-
-### 🔋 **Li-ion Battery System**
-- ✅ 12V 12AH Li-ion optimization
-- ✅ SOC calculation with health status
-- ✅ Runtime estimation & efficiency tracking
-- ✅ Power management & analytics
-
-</td>
-<td>
-
-### 📊 **Sensor Analytics**
-- ✅ 9-sensor monitoring with error detection
-- ✅ NoSQL JSON storage with compression
-- ✅ Energy analytics & battery health scoring
-- ✅ Real-time data streaming (5s updates)
-
-</td>
-</tr>
-<tr>
-<td>
-
-### 🌍 **External Access**
-- ✅ PageKite HTTPS tunnel
-- ✅ Firebase web hosting
-- ✅ Mobile PWA support
-- ✅ Global secure access
-
-</td>
-<td>
-
-### 🚀 **Auto Deployment**
-- ✅ One-click Pi deployment
-- ✅ Systemd service integration
-- ✅ Auto-dependency installation
-- ✅ Zero-configuration setup
-
-</td>
-</tr>
-</table>
-
-## 🔗 **Arduino-Pi-Web Communication Flow**
-
-```
-Arduino Mega 2560 (9 Sensors)
-        ↓ Serial USB (115200 baud)
-        ↓ JSON Protocol: [SEND] - {"name":"SENSOR_NAME","value":[...]}
-Raspberry Pi Server (Flask API)
-        ↓ HTTP/WebSocket APIs (7 endpoints)
-        ↓ Real-time data processing & storage
-React Web Application (TypeScript)
-        ↓ Firebase Hosting (HTTPS)
-        ↓ Mobile PWA + Desktop interface
-User Access (Global HTTPS)
-```
-
-### ✅ **Communication Status: 100% Operational**
-- **Arduino → Pi**: Serial JSON parsing with Li-ion enhancement
-- **Pi → Web App**: RESTful API + WebSocket real-time updates  
-- **Web App → User**: React dashboard with sensor charts & controls
+### ✅ **Improved Architecture**
+- **High-performance Arduino communication** (115200 baud)
+- **Real-time WebSocket updates** (2-second intervals)
+- **Firebase Realtime Database** sync (5-second intervals)
+- **Comprehensive error handling** with graceful fallbacks
 
 ---
 
-## 🚀 Quick Start
+## 📋 **System Overview**
 
-### ⚡ One-Click Deployment (Recommended)
+```
+📱 Arduino Mega 2560 → 🔌 USB/Serial → 🥧 Raspberry Pi → 🔥 Firebase → 🌐 Web App
+```
 
+### **Key Components:**
+- **Arduino Mega 2560** - Sensor controller with optimized JSON output
+- **Raspberry Pi** - Main server with Flask API and real-time processing
+- **Firebase Realtime DB** - Cloud storage for sensor data and configuration
+- **Web Application** - React/Vue.js dashboard with live monitoring
+
+---
+
+## 🔧 **Quick Setup**
+
+### **1. Installation**
 ```bash
 # Clone repository
-git clone <repository-url>
-cd pi-mqtt-server
+git clone https://github.com/your-repo/fish-feeder-pi-controller.git
+cd fish-feeder-pi-controller
 
-# Deploy to Pi in one command!
-python3 deployment/one_click_deploy.py
-```
-
-### 🎯 Manual Setup
-
-```bash
-# Deploy files to Pi
-./deployment/deploy_to_pi.sh
-
-# SSH to Pi and setup
-ssh pi@raspberrypi.local
-cd /home/pi/pi-mqtt-server
-./auto_setup_pi.sh
-
-# Setup Google Drive OAuth
-python3 scripts/google_drive_setup.py
-
-# Start system
-python3 main.py
-```
-
----
-
-## 📁 Project Structure
-
-```
-pi-mqtt-server/
-├── 📄 main.py                    # Core application (2119 lines)
-├── 🔧 smart_hybrid_storage.py    # Storage management system  
-├── 📊 sensor_history_manager.py  # NoSQL sensor analytics (844 lines)
-├── 📋 VERSION                    # Current version (3.1.0)
-├── 🔐 serviceAccountKey.json     # Firebase credentials
-│
-├── 📂 config/                    # Configuration files
-├── 📂 deployment/                # Deployment scripts  
-├── 📂 scripts/                   # Utility scripts
-├── 📂 docs/                      # Documentation
-├── 📂 storage/                   # Data directory (auto-created)
-├── 📂 logs/                      # System & sensor logs
-└── 📂 .git/                      # Git repository
-```
-
----
-
-## 💾 Smart Storage System (100% Operational)
-
-### 🔄 Auto Migration Flow
-
-```mermaid
-graph LR
-    A[📹 Video Recording] --> B[💾 Pi Local 128GB]
-    B --> C[🔥 Firebase 5GB]
-    C --> D[🌐 Google Drive 200GB]
-    D --> E[🗑️ Pi Cleanup]
-    
-    style A fill:#ff6b6b
-    style B fill:#4ecdc4
-    style C fill:#45b7d1
-    style D fill:#96ceb4
-    style E fill:#feca57
-```
-
-### 📊 Storage Performance
-
-| Storage Tier | Capacity | Write Speed | Retention | Status |
-|-------------|----------|-------------|-----------|---------|
-| **Pi Local** | 128GB | 50MB/s | 7 days | ✅ Active |
-| **Firebase** | 5GB | 10MB/s | 24h → GDrive | ✅ Active |
-| **Google Drive** | 200GB | 5MB/s | Long-term | ✅ Active |
-| **Total System** | **333GB** | Auto-tiered | Smart cleanup | ✅ 100% Ready |
-
----
-
-## 🌐 Live Demo URLs
-
-| Service | URL | Status |
-|---------|-----|--------|
-| 🖥️ **Main Web App** | https://fish-feeder-test-1.web.app | ✅ Live |
-| 🌍 **External Access** | https://b65iee02.pagekite.me | ✅ Live |  
-| 🏠 **Local Access** | http://192.168.1.100:5000 | ✅ Live |
-| 📱 **Mobile PWA** | Add to Home Screen supported | ✅ Ready |
-
----
-
-## 🔧 Complete API Reference
-
-### 📊 Sensor APIs (7 Endpoints)
-```bash
-GET /api/sensors/live?limit=200        # Live sensor data
-GET /api/sensors/{sensor_name}         # Specific sensor
-GET /api/sensors/history               # Historical data
-GET /api/analytics/energy?days=30      # Energy analytics  
-GET /api/analytics/battery             # Li-ion battery health
-GET /api/storage/info                  # Storage statistics
-POST /api/storage/cleanup              # Storage cleanup
-```
-
-### 🎬 Video Recording
-```bash
-POST /api/camera/record/start          # Start recording
-POST /api/camera/record/stop           # Stop recording
-GET /api/camera/record/status          # Recording status
-GET /api/camera/video_feed             # Live stream
-```
-
-### 🌐 PageKite Control  
-```bash
-POST /api/pagekite/start               # Start HTTPS tunnel
-POST /api/pagekite/stop                # Stop tunnel
-GET /api/pagekite/status               # Tunnel status
-```
-
-### ⚙️ Device Control
-```bash
-POST /api/relay/led/{action}           # LED control
-POST /api/relay/fan/{action}           # Fan control  
-POST /api/control/feed                 # Feed fish
-POST /api/control/weight/calibrate     # Weight calibration
-```
-
----
-
-## 🔋 Li-ion Battery Integration (100% Complete)
-
-### Battery Specifications Supported:
-- **Type**: Li-ion 12V 12AH (Lithium-ion)
-- **Capacity**: 12 Amp-hours  
-- **Voltage Range**: 8.4V - 12.6V operating
-- **Charging**: Built-in balance board
-- **Cycle Life**: ≥1000 cycles
-- **Safety**: No explosion/fire, environmentally friendly
-
-### Enhanced Monitoring:
-- ✅ **SOC Calculation**: Voltage-to-SOC mapping  
-- ✅ **Health Status**: 6 levels (CRITICAL → EXCELLENT)
-- ✅ **Runtime Estimation**: Current load-based calculation
-- ✅ **Power Metrics**: Real-time power & efficiency
-- ✅ **Performance Rating**: Advanced battery analytics
-
----
-
-## 📈 System Performance (All Targets Achieved)
-
-| Metric | Target | Achieved | Performance |
-|---------|---------|----------|-------------|  
-| **Arduino Response** | <10ms | <5ms | 200% ⚡ |
-| **Pi API Response** | <50ms | <25ms | 200% 🚀 |
-| **Chart Loading** | <1.5s | <1.0s | 150% 📊 |
-| **Real-time Updates** | 5s | 1s | 500% ⚡ |
-| **Battery Accuracy** | ±5% | ±1% | 500% 🎯 |
-| **Mobile Performance** | 30fps | 60fps | 200% 📱 |
-
----
-
-## 🎉 **STATUS: 100% PRODUCTION READY**
-
-✅ **All Features Implemented**  
-✅ **Performance Targets Exceeded**  
-✅ **Arduino-Pi-Web Communication Verified**  
-✅ **Li-ion Battery System Optimized**  
-✅ **Global HTTPS Access Deployed**  
-✅ **Mobile PWA Functional**  
-✅ **Real-time Analytics Active**  
-✅ **Storage System Operational**
-
-**🐟 Your Fish Feeder IoT System is now complete and ready for production deployment! 🚀**
-
----
-
-## 🛠️ Development
-
-### 🔄 Local Development
-```bash
 # Install dependencies
-pip3 install -r config/requirements_enhanced.txt
+pip install -r requirements.txt
 
-# Run development server
-python3 main.py
-
-# Run tests
-python3 scripts/test_google_drive.py
+# Setup Firebase credentials
+cp serviceAccountKey.json.example serviceAccountKey.json
+# Edit with your Firebase credentials
 ```
 
-### 🧪 Testing
+### **2. Configuration**
 ```bash
-# Test storage system
-python3 -c "
-from smart_hybrid_storage import SmartHybridStorage
-storage = SmartHybridStorage()
-print(storage.get_storage_status())
-"
+# Configure system
+cp config/storage_config.json.example config/storage_config.json
+# Edit configuration as needed
 
-# Test PageKite
-./scripts/status_pagekite.sh
+# Test Arduino connection
+python -c "from main import ArduinoManager; import logging; am = ArduinoManager(logging.getLogger()); print('Arduino found!' if am.find_arduino() else 'Arduino not found')"
+```
 
-# Test camera
-raspistill -o test.jpg
+### **3. Run Server**
+```bash
+# Start the main server
+python main.py
+
+# Server will be available at:
+# Web Interface: http://localhost:5000
+# API Endpoints: http://localhost:5000/api/*
+# WebSocket: ws://localhost:5000
 ```
 
 ---
 
-## 📋 Configuration
+## 📊 **Sensor Data & API**
 
-### 🔧 Storage Config (`config/storage_config.json`)
+### **Complete Sensor Coverage:**
+
+| Sensor | Arduino Key | API Output | Status |
+|--------|-------------|------------|--------|
+| Battery Voltage | `bat_v` | `BATTERY_STATUS.voltage` | ✅ |
+| Battery Current | `bat_i` | `BATTERY_STATUS.current` | ✅ |
+| Solar Voltage | `sol_v` | `SOLAR_VOLTAGE.voltage` | ✅ |
+| Solar Current | `sol_i` | `SOLAR_CURRENT.current` | ✅ |
+| Feed Temperature | `feed_temp` | `FEED_TEMPERATURE.temperature` | ✅ |
+| Control Temperature | `ctrl_temp` | `CONTROL_TEMPERATURE.temperature` | ✅ |
+| Feed Humidity | `feed_hum` | `FEED_HUMIDITY.humidity` | ✅ |
+| Control Humidity | `ctrl_hum` | `CONTROL_HUMIDITY.humidity` | ✅ |
+| Weight Sensor | `weight` | `WEIGHT.weight` | ✅ |
+| Soil Moisture | `soil` | `SOIL_MOISTURE.moisture` | ✅ |
+
+### **API Example Response:**
 ```json
 {
-  "pi_local": {
-    "path": "/home/pi/fish_feeder_data",
-    "max_size_gb": 128,
-    "cleanup_days": 7
+  "timestamp": "2025-12-06T14:30:00.000Z",
+  "arduino_connected": true,
+  "BATTERY_STATUS": {
+    "voltage": {"value": 11.89, "unit": "V", "timestamp": "2025-12-06T14:30:00.000Z"},
+    "current": {"value": 2.10, "unit": "A", "timestamp": "2025-12-06T14:30:00.000Z"},
+    "soc": {"value": 78.0, "unit": "%", "timestamp": "2025-12-06T14:30:00.000Z"}
   },
-  "firebase": {
-    "max_size_gb": 5,
-    "bucket": "fish-feeder-test-1.appspot.com"
-  },
-  "google_drive": {
-    "max_size_gb": 200,
-    "folder_name": "FishFeeder_Videos"
-  },
-  "pagekite": {
-    "subdomain": "b65iee02.pagekite.me",
-    "local_port": 5000
+  "FEED_TEMPERATURE": {
+    "temperature": {"value": 25.3, "unit": "°C", "timestamp": "2025-12-06T14:30:00.000Z"}
   }
 }
 ```
 
-### 🔐 Environment Variables
+---
+
+## 🎮 **Control Commands**
+
+### **Feed Control**
 ```bash
-export GOOGLE_APPLICATION_CREDENTIALS="config/google_drive_credentials.json"
-export FIREBASE_SERVICE_ACCOUNT="serviceAccountKey.json"
-export PAGEKITE_SUBDOMAIN="b65iee02.pagekite.me"
+# API: POST /api/feed
+curl -X POST http://localhost:5000/api/feed \
+  -H "Content-Type: application/json" \
+  -d '{"action": "medium", "amount": 100}'
+
+# Arduino Command: G:20 (auger 20 seconds)
+```
+
+### **Device Control**
+```bash
+# Blower Control
+curl -X POST http://localhost:5000/api/control/blower \
+  -d '{"action": "start", "speed": 255}'
+
+# Actuator Control  
+curl -X POST http://localhost:5000/api/control/actuator \
+  -d '{"action": "up", "duration": 3.0}'
+
+# Direct Arduino Command
+curl -X POST http://localhost:5000/api/control/direct \
+  -d '{"command": "R:1"}'  # LED on
 ```
 
 ---
 
-## 🚨 Troubleshooting
+## 🌐 **Real-time Features**
 
-<details>
-<summary>📦 <strong>Deployment Issues</strong></summary>
+### **WebSocket Events**
+```javascript
+// Connect to WebSocket
+const socket = io('http://localhost:5000');
 
-```bash
-# Check Pi connection
-ping raspberrypi.local
+// Listen for real-time sensor updates
+socket.on('sensor_update', (data) => {
+  console.log('Live sensor data:', data);
+});
 
-# Test SSH
-ssh pi@raspberrypi.local
-
-# Re-deploy
-python3 deployment/one_click_deploy.py
+// Request system status
+socket.emit('request_system_status');
 ```
-</details>
 
-<details>
-<summary>☁️ <strong>Storage Issues</strong></summary>
+### **Firebase Integration**
+- **Real-time sync** every 5 seconds
+- **Cloud storage** for sensor history
+- **Cross-platform access** for multiple devices
+- **Offline resilience** with local backup
 
-```bash
-# Check storage status
-python3 -c "
-from smart_hybrid_storage import SmartHybridStorage
-storage = SmartHybridStorage()
-print(storage.get_storage_status())
-"
+---
 
-# Test Google Drive
-python3 scripts/test_google_drive.py
+## 📁 **Project Structure**
 
-# Re-setup OAuth
-python3 scripts/google_drive_setup.py
 ```
-</details>
+📁 pi-mqtt-server/
+├── 📄 main.py                    # Main Flask server & Arduino manager
+├── 📄 sensor_history_manager.py  # Historical data storage & analytics
+├── 📄 serviceAccountKey.json     # Firebase credentials
+├── 📄 requirements.txt           # Python dependencies
+├── 📄 API_REFERENCE.md          # Complete API documentation
+├── 📄 WEB_APP_INTEGRATION.md    # Web app integration guide
+├── 📄 UPGRADE_SUMMARY.md        # Recent improvements summary
+├── 📁 config/                   # Configuration files
+│   ├── 📄 storage_config.json   # Storage settings
+│   └── 📄 google_drive_credentials.json
+├── 📁 data/                     # Local sensor data storage
+│   └── 📁 sensor_history/
+├── 📁 logs/                     # System & sensor logs
+│   ├── 📄 system.log
+│   └── 📁 2025-06-12/
+└── 📁 docs/                     # Complete documentation
+    ├── 📄 FINAL_STATUS_v2.0.0.md
+    ├── 📄 DEPLOY_INSTRUCTIONS.md
+    └── 📄 SETUP_COMPLETE.md
+```
 
-<details>
-<summary>🌐 <strong>PageKite Issues</strong></summary>
+---
 
+## ⚡ **Performance & Reliability**
+
+### **Optimized Communication**
+- **115200 baud** Arduino serial connection
+- **1ms main loop** on Arduino for real-time response
+- **Non-blocking operations** with threading
+- **Smart error recovery** and reconnection
+
+### **Data Management**
+- **128GB Pi storage** optimization
+- **Intelligent data retention** (30 days raw, 1 year hourly, 5 years daily)
+- **Background data compression** for long-term storage
+- **Firebase cloud backup** for data safety
+
+### **System Monitoring**
+- **Real-time health checks** for all components
+- **Battery SOC calculation** for Li-ion 12V 12AH
+- **Solar panel efficiency** monitoring
+- **System temperature** protection
+
+---
+
+## 🔧 **Configuration Options**
+
+### **Timing Settings**
+```json
+{
+  "sensor_read_interval": 3,
+  "firebase_sync_interval": 5,
+  "websocket_broadcast_interval": 2
+}
+```
+
+### **Feed Presets**
+```json
+{
+  "small": {"amount": 50, "auger_duration": 10},
+  "medium": {"amount": 100, "auger_duration": 20},
+  "large": {"amount": 200, "auger_duration": 40},
+  "xl": {"amount": 1000, "auger_duration": 120}
+}
+```
+
+### **Auto-Feed Schedule**
+```json
+{
+  "auto_feed_enabled": true,
+  "auto_feed_schedule": [
+    {"time": "08:00", "preset": "medium", "enabled": true},
+    {"time": "14:00", "preset": "small", "enabled": true},
+    {"time": "18:00", "preset": "medium", "enabled": true}
+  ]
+}
+```
+
+---
+
+## 🛠️ **Development**
+
+### **Testing**
 ```bash
+# Test Arduino connection
+python -c "import main; main.test_arduino_connection()"
+
+# Test Firebase connection
+python -c "import main; main.test_firebase_connection()"
+
+# Run sensor data test
+python -c "import main; main.test_sensor_parsing()"
+```
+
+### **Debugging**
+```bash
+# Enable debug mode
+export FLASK_DEBUG=1
+python main.py
+
+# View real-time logs
+tail -f logs/system.log
+
+# Monitor sensor data
+tail -f logs/2025-06-12/sensor_log.txt
+```
+
+---
+
+## 📖 **Documentation**
+
+- 📄 **[API Reference](API_REFERENCE.md)** - Complete REST API documentation
+- 📄 **[Web App Integration](WEB_APP_INTEGRATION.md)** - Frontend integration guide
+- 📄 **[Upgrade Summary](UPGRADE_SUMMARY.md)** - Recent improvements details
+- 📄 **[Project Structure](PROJECT_STRUCTURE.md)** - File organization guide
+
+---
+
+## 🚀 **Deployment**
+
+### **Production Setup**
+```bash
+# Install as systemd service
+sudo cp scripts/fish-feeder.service /etc/systemd/system/
+sudo systemctl enable fish-feeder
+sudo systemctl start fish-feeder
+
 # Check status
-./scripts/status_pagekite.sh
-
-# Restart tunnel
-./scripts/stop_pagekite.sh
-./scripts/start_pagekite.sh
-
-# Re-configure
-python3 scripts/pagekite_setup.py
+sudo systemctl status fish-feeder
 ```
-</details>
 
-<details>
-<summary>🎬 <strong>Video Recording Issues</strong></summary>
-
+### **Web Server Integration**
 ```bash
-# Test camera
-raspistill -o test.jpg
-
-# Check permissions
-ls -la /home/pi/fish_feeder_data/
-
-# Fix permissions
-sudo chown -R pi:pi /home/pi/fish_feeder_data/
+# Nginx configuration
+sudo cp config/nginx.conf /etc/nginx/sites-available/fish-feeder
+sudo ln -s /etc/nginx/sites-available/fish-feeder /etc/nginx/sites-enabled/
+sudo systemctl reload nginx
 ```
-</details>
 
 ---
 
-## 📜 License
+## 🌟 **Features**
 
-MIT License - feel free to use and modify!
+- ✅ **Real-time sensor monitoring** with WebSocket updates
+- ✅ **Automated feeding system** with customizable presets
+- ✅ **Battery & solar monitoring** with efficiency calculations
+- ✅ **Temperature & humidity control** with automatic fan management
+- ✅ **Weight-based feeding** with precision load cell
+- ✅ **Camera integration** for feeding verification
+- ✅ **Firebase cloud sync** for remote access
+- ✅ **Historical data analytics** with trend analysis
+- ✅ **RESTful API** for third-party integration
+- ✅ **Responsive web interface** for all devices
 
 ---
 
-## 🤝 Contributing
+## 📞 **Support & Contributing**
 
-1. Fork the project
+### **Getting Help**
+- 📧 Create an issue on GitHub
+- 📚 Check the [documentation](docs/)
+- 💬 Join our community discussions
+
+### **Contributing**
+1. Fork the repository
 2. Create feature branch (`git checkout -b feature/amazing-feature`)
 3. Commit changes (`git commit -m 'Add amazing feature'`)
 4. Push to branch (`git push origin feature/amazing-feature`)
@@ -432,19 +341,29 @@ MIT License - feel free to use and modify!
 
 ---
 
-## 📞 Support
+## 📄 **License**
 
-- 📖 **Documentation**: Check `docs/` folder
-- 🐛 **Issues**: Open GitHub issue
-- 💬 **Discussions**: GitHub discussions
-- 📧 **Contact**: [Your email]
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
-<div align="center">
+## 🎯 **System Requirements**
 
-**🎉 Made with ❤️ for Smart Fish Feeding**
+- **Raspberry Pi 3B+** or newer
+- **Arduino Mega 2560** or compatible
+- **Python 3.8+**
+- **Node.js 16+** (for web app)
+- **Firebase project** with Realtime Database
+- **8GB+ microSD card** (16GB+ recommended)
 
-⭐ **Star this repo if it helped you!** ⭐
+---
 
-</div>
+## 🔗 **Related Projects**
+
+- [Fish Feeder Arduino Code](../fish-feeder-arduino/) - Arduino firmware
+- [Fish Feeder Web App](../fish-feeder-web/) - React/Vue.js frontend
+- [Mobile App](../fish-feeder-mobile/) - React Native mobile application
+
+---
+
+**⭐ If this project helps you, please give it a star!**

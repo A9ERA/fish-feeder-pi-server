@@ -1,9 +1,0 @@
-# 🐟 Fish Feeder Arduino + Pi Controller - Dependencies
-flask==2.3.3
-flask-cors==4.0.0
-flask-socketio==5.3.6
-python-socketio==5.9.0
-pyserial==3.5
-firebase-admin==6.2.0
-opencv-python==4.8.1.78
-pathlib2==2.3.7
