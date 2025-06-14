@@ -69,18 +69,56 @@ class ControlService:
         """Set blower direction to normal"""
         return self._send_command("blower:direction:normal")
 
-    # Actuator motor control methods
-    def actuator_motor_up(self) -> bool:
-        """Move actuator motor up"""
-        return self._send_command("actuatormotor:up")
+    # Actuator control methods (updated to match Arduino commands)
+    def actuator_up(self) -> bool:
+        """Move actuator up"""
+        return self._send_command("actuator:up")
 
-    def actuator_motor_down(self) -> bool:
-        """Move actuator motor down"""
-        return self._send_command("actuatormotor:down")
+    def actuator_down(self) -> bool:
+        """Move actuator down"""
+        return self._send_command("actuator:down")
 
-    def actuator_motor_stop(self) -> bool:
-        """Stop actuator motor"""
-        return self._send_command("actuatormotor:stop")
+    def actuator_stop(self) -> bool:
+        """Stop actuator"""
+        return self._send_command("actuator:stop")
+
+    # Auger control methods
+    def auger_forward(self) -> bool:
+        """Move auger forward"""
+        return self._send_command("auger:forward")
+
+    def auger_backward(self) -> bool:
+        """Move auger backward"""
+        return self._send_command("auger:backward")
+
+    def auger_stop(self) -> bool:
+        """Stop auger"""
+        return self._send_command("auger:stop")
+
+    def auger_speedtest(self) -> bool:
+        """Run auger speed test"""
+        return self._send_command("auger:speedtest")
+
+    # Relay control methods
+    def relay_led_on(self) -> bool:
+        """Turn LED relay on"""
+        return self._send_command("relay:led:on")
+
+    def relay_led_off(self) -> bool:
+        """Turn LED relay off"""
+        return self._send_command("relay:led:off")
+
+    def relay_fan_on(self) -> bool:
+        """Turn fan relay on"""
+        return self._send_command("relay:fan:on")
+
+    def relay_fan_off(self) -> bool:
+        """Turn fan relay off"""
+        return self._send_command("relay:fan:off")
+
+    def relay_all_off(self) -> bool:
+        """Turn all relays off"""
+        return self._send_command("relay:all:off")
 
     # Convenience methods for common operations
     def control_blower(self, action: str, value: Optional[int] = None) -> bool:
@@ -108,19 +146,70 @@ class ControlService:
             print(f"Unknown blower action: {action}")
             return False
 
-    def control_actuator_motor(self, action: str) -> bool:
+    def control_actuator(self, action: str) -> bool:
         """
-        Control actuator motor with a single method
+        Control actuator with a single method
         
         Args:
             action: Action to perform ('up', 'down', 'stop')
         """
         if action == "up":
-            return self.actuator_motor_up()
+            return self.actuator_up()
         elif action == "down":
-            return self.actuator_motor_down()
+            return self.actuator_down()
         elif action == "stop":
-            return self.actuator_motor_stop()
+            return self.actuator_stop()
         else:
-            print(f"Unknown actuator motor action: {action}")
-            return False 
+            print(f"Unknown actuator action: {action}")
+            return False
+
+    def control_auger(self, action: str) -> bool:
+        """
+        Control auger with a single method
+        
+        Args:
+            action: Action to perform ('forward', 'backward', 'stop', 'speedtest')
+        """
+        if action == "forward":
+            return self.auger_forward()
+        elif action == "backward":
+            return self.auger_backward()
+        elif action == "stop":
+            return self.auger_stop()
+        elif action == "speedtest":
+            return self.auger_speedtest()
+        else:
+            print(f"Unknown auger action: {action}")
+            return False
+
+    def control_relay(self, device: str, action: str) -> bool:
+        """
+        Control relay with a single method
+        
+        Args:
+            device: Device to control ('led', 'fan', 'all')
+            action: Action to perform ('on', 'off')
+        """
+        if device == "led":
+            if action == "on":
+                return self.relay_led_on()
+            elif action == "off":
+                return self.relay_led_off()
+        elif device == "fan":
+            if action == "on":
+                return self.relay_fan_on()
+            elif action == "off":
+                return self.relay_fan_off()
+        elif device == "all" and action == "off":
+            return self.relay_all_off()
+        
+        print(f"Unknown relay device/action: {device}/{action}")
+        return False
+
+    # Legacy method name compatibility
+    def control_actuator_motor(self, action: str) -> bool:
+        """
+        Legacy method name for actuator control
+        Redirects to control_actuator for backward compatibility
+        """
+        return self.control_actuator(action) 

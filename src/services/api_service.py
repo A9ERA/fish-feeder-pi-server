@@ -46,6 +46,8 @@ class APIService:
         # Device control routes
         self.app.route('/api/control/blower', methods=['POST'])(self.control_blower)
         self.app.route('/api/control/actuator', methods=['POST'])(self.control_actuator_motor)
+        self.app.route('/api/control/auger', methods=['POST'])(self.control_auger)
+        self.app.route('/api/control/relay', methods=['POST'])(self.control_relay)
 
     def index(self):
         """Render the main video streaming page"""
@@ -297,6 +299,114 @@ class APIService:
             return jsonify({
                 'status': 'error',
                 'message': f'Error controlling actuator motor: {str(e)}'
+            }), 500
+
+    def control_auger(self):
+        """Control auger device via API"""
+        try:
+            if not request.is_json:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Request must be JSON'
+                }), 400
+
+            data = request.get_json()
+            action = data.get('action')
+
+            if not action:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Action is required'
+                }), 400
+
+            # Validate actions
+            valid_actions = ['forward', 'backward', 'stop', 'speedtest']
+            if action not in valid_actions:
+                return jsonify({
+                    'status': 'error',
+                    'message': f'Invalid action. Valid actions are: {", ".join(valid_actions)}'
+                }), 400
+
+            # Send command via control service
+            success = self.control_service.control_auger(action)
+
+            if success:
+                return jsonify({
+                    'status': 'success',
+                    'message': f"Auger {action} command sent successfully"
+                })
+            else:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Failed to send command to device'
+                }), 500
+
+        except Exception as e:
+            return jsonify({
+                'status': 'error',
+                'message': f'Error controlling auger: {str(e)}'
+            }), 500
+
+    def control_relay(self):
+        """Control relay device via API"""
+        try:
+            if not request.is_json:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Request must be JSON'
+                }), 400
+
+            data = request.get_json()
+            device = data.get('device')
+            action = data.get('action')
+
+            if not device or not action:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Both device and action are required'
+                }), 400
+
+            # Validate device and action combinations
+            valid_devices = ['led', 'fan', 'all']
+            valid_actions = ['on', 'off']
+            
+            if device not in valid_devices:
+                return jsonify({
+                    'status': 'error',
+                    'message': f'Invalid device. Valid devices are: {", ".join(valid_devices)}'
+                }), 400
+
+            if action not in valid_actions:
+                return jsonify({
+                    'status': 'error',
+                    'message': f'Invalid action. Valid actions are: {", ".join(valid_actions)}'
+                }), 400
+
+            # Special validation for 'all' device - only 'off' is supported
+            if device == 'all' and action != 'off':
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Only "off" action is supported for "all" device'
+                }), 400
+
+            # Send command via control service
+            success = self.control_service.control_relay(device, action)
+
+            if success:
+                return jsonify({
+                    'status': 'success',
+                    'message': f"Relay {device} {action} command sent successfully"
+                })
+            else:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Failed to send command to device'
+                }), 500
+
+        except Exception as e:
+            return jsonify({
+                'status': 'error',
+                'message': f'Error controlling relay: {str(e)}'
             }), 500
 
     def sync_sensors_to_firebase(self):

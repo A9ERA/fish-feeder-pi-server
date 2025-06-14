@@ -1,128 +1,197 @@
 # Device Control API Documentation
 
-This document describes the API endpoints for controlling Arduino devices connected via serial communication.
-
 ## Overview
+This API provides endpoints to control various devices connected to the Arduino via serial communication.
 
-The Pi Server now includes device control functionality that allows you to send commands to Arduino devices via the serial connection. The supported devices are:
-- **Blower**: For controlling fan/blower operations
-- **Actuator Motor**: For linear actuator control
+## Arduino Commands Supported
+The following commands are supported by the Arduino:
+
+```
+[control]:blower:start
+[control]:blower:stop
+[control]:blower:speed:100
+[control]:blower:direction:reverse
+[control]:blower:direction:normal
+[control]:actuator:up
+[control]:actuator:down
+[control]:actuator:stop
+[control]:auger:forward
+[control]:auger:backward
+[control]:auger:stop
+[control]:auger:speedtest
+[control]:relay:led:on
+[control]:relay:led:off
+[control]:relay:fan:on
+[control]:relay:fan:off
+[control]:relay:all:off
+```
 
 ## API Endpoints
 
-### Blower Control
-
+### 1. Blower Control
 **Endpoint:** `POST /api/control/blower`
 
 **Request Body:**
 ```json
 {
-    "action": "start|stop|speed|direction_reverse|direction_normal",
-    "value": 100  // Required only for "speed" action
+  "action": "start|stop|speed|direction_reverse|direction_normal",
+  "value": 100  // Required only for speed action
 }
 ```
 
-**Actions:**
-- `start` - Start the blower
-- `stop` - Stop the blower
-- `speed` - Set blower speed (requires `value` parameter)
-- `direction_reverse` - Set blower direction to reverse
-- `direction_normal` - Set blower direction to normal
-
 **Examples:**
-
-Start blower:
 ```bash
+# Start blower
 curl -X POST http://localhost:5000/api/control/blower \
   -H "Content-Type: application/json" \
   -d '{"action": "start"}'
-```
 
-Set blower speed:
-```bash
+# Set blower speed
 curl -X POST http://localhost:5000/api/control/blower \
   -H "Content-Type: application/json" \
-  -d '{"action": "speed", "value": 150}'
-```
+  -d '{"action": "speed", "value": 100}'
 
-Stop blower:
-```bash
+# Set blower direction to reverse
 curl -X POST http://localhost:5000/api/control/blower \
   -H "Content-Type: application/json" \
-  -d '{"action": "stop"}'
+  -d '{"action": "direction_reverse"}'
 ```
 
-**Response:**
-```json
-{
-    "status": "success",
-    "message": "Blower start command sent successfully"
-}
-```
-
-### Actuator Motor Control
-
+### 2. Actuator Control
 **Endpoint:** `POST /api/control/actuator`
 
 **Request Body:**
 ```json
 {
-    "action": "up|down|stop"
+  "action": "up|down|stop"
 }
 ```
 
-**Actions:**
-- `up` - Move actuator motor up
-- `down` - Move actuator motor down
-- `stop` - Stop actuator motor
-
 **Examples:**
-
-Move actuator up:
 ```bash
+# Move actuator up
 curl -X POST http://localhost:5000/api/control/actuator \
   -H "Content-Type: application/json" \
   -d '{"action": "up"}'
-```
 
-Move actuator down:
-```bash
+# Move actuator down
 curl -X POST http://localhost:5000/api/control/actuator \
   -H "Content-Type: application/json" \
   -d '{"action": "down"}'
-```
 
-Stop actuator:
-```bash
+# Stop actuator
 curl -X POST http://localhost:5000/api/control/actuator \
   -H "Content-Type: application/json" \
   -d '{"action": "stop"}'
 ```
 
-**Response:**
+### 3. Auger Control
+**Endpoint:** `POST /api/control/auger`
+
+**Request Body:**
 ```json
 {
-    "status": "success",
-    "message": "Actuator motor up command sent successfully"
+  "action": "forward|backward|stop|speedtest"
 }
 ```
 
-## Arduino Command Format
+**Examples:**
+```bash
+# Move auger forward
+curl -X POST http://localhost:5000/api/control/auger \
+  -H "Content-Type: application/json" \
+  -d '{"action": "forward"}'
 
-The control service sends commands to the Arduino in the following format:
-```
-[control]:device:action:value\n
+# Move auger backward
+curl -X POST http://localhost:5000/api/control/auger \
+  -H "Content-Type: application/json" \
+  -d '{"action": "backward"}'
+
+# Stop auger
+curl -X POST http://localhost:5000/api/control/auger \
+  -H "Content-Type: application/json" \
+  -d '{"action": "stop"}'
+
+# Run auger speed test
+curl -X POST http://localhost:5000/api/control/auger \
+  -H "Content-Type: application/json" \
+  -d '{"action": "speedtest"}'
 ```
 
-**Examples of commands sent to Arduino:**
-- `[control]:blower:start\n`
-- `[control]:blower:stop\n`
-- `[control]:blower:speed:100\n`
-- `[control]:blower:direction:reverse\n`
-- `[control]:blower:direction:normal\n`
-- `[control]:actuatormotor:up\n`
-- `[control]:actuatormotor:down\n`
-- `[control]:actuatormotor:stop\n`
+### 4. Relay Control
+**Endpoint:** `POST /api/control/relay`
+
+**Request Body:**
+```json
+{
+  "device": "led|fan|all",
+  "action": "on|off"
+}
+```
+
+**Note:** For device "all", only action "off" is supported.
+
+**Examples:**
+```bash
+# Turn LED on
+curl -X POST http://localhost:5000/api/control/relay \
+  -H "Content-Type: application/json" \
+  -d '{"device": "led", "action": "on"}'
+
+# Turn LED off
+curl -X POST http://localhost:5000/api/control/relay \
+  -H "Content-Type: application/json" \
+  -d '{"device": "led", "action": "off"}'
+
+# Turn fan on
+curl -X POST http://localhost:5000/api/control/relay \
+  -H "Content-Type: application/json" \
+  -d '{"device": "fan", "action": "on"}'
+
+# Turn fan off
+curl -X POST http://localhost:5000/api/control/relay \
+  -H "Content-Type: application/json" \
+  -d '{"device": "fan", "action": "off"}'
+
+# Turn all relays off
+curl -X POST http://localhost:5000/api/control/relay \
+  -H "Content-Type: application/json" \
+  -d '{"device": "all", "action": "off"}'
+```
+
+## Response Format
+
+### Success Response
+```json
+{
+  "status": "success",
+  "message": "Command sent successfully"
+}
+```
+
+### Error Response
+```json
+{
+  "status": "error",
+  "message": "Error description"
+}
+```
+
+## Error Codes
+- `400 Bad Request` - Invalid request format or parameters
+- `500 Internal Server Error` - Failed to send command to device
+
+## Testing
+
+You can test all endpoints using the provided curl commands above. Make sure the server is running on `http://localhost:5000` before testing.
+
+## Implementation Notes
+
+1. All commands are sent to Arduino via serial communication with the format: `[control]:<command>\n`
+2. The API validates all input parameters before sending commands
+3. Serial connection status is checked before sending commands
+4. Thread-safe command sending using locks to prevent concurrent access
+5. Comprehensive error handling for both invalid requests and device communication failures
 
 ## Web Interface
 

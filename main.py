@@ -51,6 +51,8 @@ def main():
         print("  - POST /api/sensors/sync          - Sync to Firebase")
         print("  - POST /api/control/blower        - Control blower")
         print("  - POST /api/control/actuator      - Control actuator")
+        print("  - POST /api/control/auger         - Control auger")
+        print("  - POST /api/control/relay         - Control relay")
         print("\n🔥 Firebase sync endpoint: POST /api/sensors/sync")
         print("💡 Test with: curl -X POST http://localhost:5000/api/sensors/sync")
         print("\n" + "="*60)
