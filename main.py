@@ -39,8 +39,8 @@ def main():
             print(f"⚠️  Firebase connection issue: {health.get('error', 'Unknown error')}")
         
         # Initialize API service with serial service
-        # api_service = APIService(host='0.0.0.0', port=5000, serial_service=serial_service)
-        api_service = APIService(host='0.0.0.0', port=5000)
+        api_service = APIService(host='0.0.0.0', port=5000, serial_service=serial_service)
+        # api_service = APIService(host='0.0.0.0', port=5000)
 
         
         print("🌐 Server starting on http://0.0.0.0:5000")
