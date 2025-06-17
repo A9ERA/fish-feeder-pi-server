@@ -312,6 +312,7 @@ class APIService:
 
             data = request.get_json()
             action = data.get('action')
+            value = data.get('value')  # For setspeed action
 
             if not action:
                 return jsonify({
@@ -320,20 +321,36 @@ class APIService:
                 }), 400
 
             # Validate actions
-            valid_actions = ['forward', 'backward', 'stop', 'speedtest']
+            valid_actions = ['forward', 'backward', 'stop', 'speedtest', 'setspeed']
             if action not in valid_actions:
                 return jsonify({
                     'status': 'error',
                     'message': f'Invalid action. Valid actions are: {", ".join(valid_actions)}'
                 }), 400
 
+            # For setspeed action, validate value
+            if action == 'setspeed':
+                if value is None:
+                    return jsonify({
+                        'status': 'error',
+                        'message': 'Value is required for setspeed action'
+                    }), 400
+                if not isinstance(value, int) or value < 0:
+                    return jsonify({
+                        'status': 'error',
+                        'message': 'Speed value must be a positive integer'
+                    }), 400
+
             # Send command via control service
-            success = self.control_service.control_auger(action)
+            success = self.control_service.control_auger(action, value)
 
             if success:
+                message = f"Auger {action} command sent successfully"
+                if action == 'setspeed':
+                    message = f"Auger speed set to {value}"
                 return jsonify({
                     'status': 'success',
-                    'message': f"Auger {action} command sent successfully"
+                    'message': message
                 })
             else:
                 return jsonify({

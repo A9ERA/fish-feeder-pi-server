@@ -19,6 +19,7 @@ The following commands are supported by the Arduino:
 [control]:auger:backward
 [control]:auger:stop
 [control]:auger:speedtest
+[control]:auger:setspeed:100
 [control]:relay:led:on
 [control]:relay:led:off
 [control]:relay:fan:on
@@ -91,7 +92,8 @@ curl -X POST http://localhost:5000/api/control/actuator \
 **Request Body:**
 ```json
 {
-  "action": "forward|backward|stop|speedtest"
+  "action": "forward|backward|stop|speedtest|setspeed",
+  "value": 100  // Required only for setspeed action
 }
 ```
 
@@ -116,6 +118,11 @@ curl -X POST http://localhost:5000/api/control/auger \
 curl -X POST http://localhost:5000/api/control/auger \
   -H "Content-Type: application/json" \
   -d '{"action": "speedtest"}'
+
+# Set auger speed
+curl -X POST http://localhost:5000/api/control/auger \
+  -H "Content-Type: application/json" \
+  -d '{"action": "setspeed", "value": 100}'
 ```
 
 ### 4. Relay Control

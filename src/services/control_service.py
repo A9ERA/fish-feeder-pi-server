@@ -99,6 +99,18 @@ class ControlService:
         """Run auger speed test"""
         return self._send_command("auger:speedtest")
 
+    def auger_setspeed(self, speed: int) -> bool:
+        """
+        Set auger speed
+        
+        Args:
+            speed: Speed value (0-100 or device specific range)
+        """
+        if not isinstance(speed, int) or speed < 0:
+            print("Invalid speed value. Must be a positive integer.")
+            return False
+        return self._send_command(f"auger:setspeed:{speed}")
+
     # Relay control methods
     def relay_led_on(self) -> bool:
         """Turn LED relay on"""
@@ -163,12 +175,13 @@ class ControlService:
             print(f"Unknown actuator action: {action}")
             return False
 
-    def control_auger(self, action: str) -> bool:
+    def control_auger(self, action: str, value: Optional[int] = None) -> bool:
         """
         Control auger with a single method
         
         Args:
-            action: Action to perform ('forward', 'backward', 'stop', 'speedtest')
+            action: Action to perform ('forward', 'backward', 'stop', 'speedtest', 'setspeed')
+            value: Value for speed setting (required for 'setspeed' action)
         """
         if action == "forward":
             return self.auger_forward()
@@ -178,6 +191,11 @@ class ControlService:
             return self.auger_stop()
         elif action == "speedtest":
             return self.auger_speedtest()
+        elif action == "setspeed":
+            if value is None:
+                print("Speed value is required for setspeed action")
+                return False
+            return self.auger_setspeed(value)
         else:
             print(f"Unknown auger action: {action}")
             return False
