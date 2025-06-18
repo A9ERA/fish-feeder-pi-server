@@ -47,6 +47,11 @@ curl -X POST http://localhost:5000/api/control/blower \
   -H "Content-Type: application/json" \
   -d '{"action": "start"}'
 
+# Stop blower
+curl -X POST http://localhost:5000/api/control/blower \
+  -H "Content-Type: application/json" \
+  -d '{"action": "stop"}'
+
 # Set blower speed
 curl -X POST http://localhost:5000/api/control/blower \
   -H "Content-Type: application/json" \
@@ -166,6 +171,119 @@ curl -X POST http://localhost:5000/api/control/relay \
   -d '{"device": "all", "action": "off"}'
 ```
 
+### 5. Feeder Control (New)
+**Endpoint:** `POST /api/feeder/start`
+
+**Description:** 
+This endpoint starts an automated feeding process that executes a sequence of operations:
+1. Move actuator up for specified duration, then stop
+2. Move actuator down for specified duration, then stop  
+3. Run auger forward for specified duration, then stop
+4. Run blower for specified duration, then stop
+
+**Request Body:**
+```json
+{
+  "feedSize": 100,        // Feed size in grams (for reference/logging)
+  "actuatorUp": 5,        // Duration in seconds for actuator up movement
+  "actuatorDown": 3,      // Duration in seconds for actuator down movement
+  "augerDuration": 10,    // Duration in seconds for auger operation
+  "blowerDuration": 15    // Duration in seconds for blower operation
+}
+```
+
+**Parameter Validation:**
+- All parameters are required and must be integers
+- All duration parameters must be non-negative
+- Safety limit: No single operation can exceed 300 seconds (5 minutes)
+- Feed size: Any positive integer (used for logging/reference only)
+
+**Examples:**
+```bash
+# Basic feeding process
+curl -X POST http://localhost:5000/api/feeder/start \
+  -H "Content-Type: application/json" \
+  -d '{
+    "feedSize": 50,
+    "actuatorUp": 2,
+    "actuatorDown": 2,
+    "augerDuration": 5,
+    "blowerDuration": 3
+  }'
+
+# Large feeding process
+curl -X POST http://localhost:5000/api/feeder/start \
+  -H "Content-Type: application/json" \
+  -d '{
+    "feedSize": 200,
+    "actuatorUp": 10,
+    "actuatorDown": 8,
+    "augerDuration": 20,
+    "blowerDuration": 15
+  }'
+
+# Quick feeding process
+curl -X POST http://localhost:5000/api/feeder/start \
+  -H "Content-Type: application/json" \
+  -d '{
+    "feedSize": 25,
+    "actuatorUp": 1,
+    "actuatorDown": 1,
+    "augerDuration": 3,
+    "blowerDuration": 2
+  }'
+```
+
+**Success Response:**
+```json
+{
+  "status": "success",
+  "message": "Feeding process completed successfully",
+  "feed_size": 100,
+  "total_duration": 33,
+  "steps_completed": [
+    "Actuator up: 5s",
+    "Actuator down: 3s", 
+    "Auger forward: 10s",
+    "Blower: 15s"
+  ]
+}
+```
+
+**Error Response Examples:**
+```json
+// Missing parameters
+{
+  "status": "error",
+  "message": "All parameters are required: feedSize, actuatorUp, actuatorDown, augerDuration, blowerDuration"
+}
+
+// Invalid parameter type
+{
+  "status": "error", 
+  "message": "All parameters must be integers"
+}
+
+// Safety limit exceeded
+{
+  "status": "error",
+  "message": "Duration parameters cannot exceed 300 seconds for safety"
+}
+
+// Process already running
+{
+  "status": "error",
+  "message": "Feeding process is already running"
+}
+```
+
+**Safety Features:**
+- Thread-safe operation (only one feeding process can run at a time)
+- Emergency stop functionality - if any step fails, all devices are stopped
+- Parameter validation with safety limits
+- Comprehensive error handling and logging
+- Device status checking before each operation
+
 ## Response Format
 
 ### Success Response
@@ -191,6 +309,45 @@ curl -X POST http://localhost:5000/api/control/relay \
 ## Testing
 
 You can test all endpoints using the provided curl commands above. Make sure the server is running on `http://localhost:5000` before testing.
+
+### Quick Test Commands
+
+```bash
+# Test server health
+curl -X GET http://localhost:5000/health
+
+# Test individual device controls
+curl -X POST http://localhost:5000/api/control/blower \
+  -H "Content-Type: application/json" \
+  -d '{"action": "start"}'
+
+curl -X POST http://localhost:5000/api/control/actuator \
+  -H "Content-Type: application/json" \
+  -d '{"action": "up"}'
+
+curl -X POST http://localhost:5000/api/control/auger \
+  -H "Content-Type: application/json" \
+  -d '{"action": "forward"}'
+
+# Test complete feeding process
+curl -X POST http://localhost:5000/api/feeder/start \
+  -H "Content-Type: application/json" \
+  -d '{
+    "feedSize": 30,
+    "actuatorUp": 1,
+    "actuatorDown": 1,
+    "augerDuration": 2,
+    "blowerDuration": 2
+  }'
+```
+
+### Testing Tips
+
+1. **Start with short durations** when testing the feeder endpoint to avoid long waits
+2. **Check serial connection** - ensure Arduino is connected and responding
+3. **Monitor logs** - server logs will show each step of the feeding process
+4. **Emergency stop** - if needed, restart the server to stop all operations
+5. **Test error cases** - try invalid parameters to ensure proper validation
 
 ## Implementation Notes
 

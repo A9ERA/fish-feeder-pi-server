@@ -60,7 +60,7 @@ class FirebaseService:
         """
         try:
             # Get a database reference
-            ref = db.reference('/')
+            ref = db.reference('/sensors_data')
             
             # Prepare data for Firebase
             firebase_data = {

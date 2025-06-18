@@ -10,6 +10,7 @@ from .video_stream_service import VideoStreamService
 from .control_service import ControlService
 from .firebase_service import FirebaseService
 from .sensor_data_service import SensorDataService
+from .feeder_service import FeederService
 
 class APIService:
     def __init__(self, host='0.0.0.0', port=5000, serial_service=None):
@@ -26,6 +27,7 @@ class APIService:
         self.control_service = ControlService(serial_service)  # Initialize control service
         self.firebase_service = FirebaseService()  # Initialize Firebase service
         self.sensor_data_service = SensorDataService()  # Initialize sensor data service
+        self.feeder_service = FeederService(self.control_service)  # Initialize feeder service
         
         # Health check route
         self.app.route('/')(self.index)
@@ -48,6 +50,9 @@ class APIService:
         self.app.route('/api/control/actuator', methods=['POST'])(self.control_actuator_motor)
         self.app.route('/api/control/auger', methods=['POST'])(self.control_auger)
         self.app.route('/api/control/relay', methods=['POST'])(self.control_relay)
+        
+        # Feeder control routes
+        self.app.route('/api/feeder/start', methods=['POST'])(self.start_feeder)
 
     def index(self):
         """Render the main video streaming page"""
@@ -424,6 +429,96 @@ class APIService:
             return jsonify({
                 'status': 'error',
                 'message': f'Error controlling relay: {str(e)}'
+            }), 500
+
+    def start_feeder(self):
+        """Start feeder process via API"""
+        try:
+            if not request.is_json:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Request must be JSON'
+                }), 400
+
+            data = request.get_json()
+            
+            # Extract parameters from request
+            feed_size = data.get('feedSize')
+            actuator_up = data.get('actuatorUp')
+            actuator_down = data.get('actuatorDown')
+            auger_duration = data.get('augerDuration')
+            blower_duration = data.get('blowerDuration')
+
+            # Validate required parameters
+            if not all([
+                feed_size is not None,
+                actuator_up is not None,
+                actuator_down is not None,
+                auger_duration is not None,
+                blower_duration is not None
+            ]):
+                return jsonify({
+                    'status': 'error',
+                    'message': 'All parameters are required: feedSize, actuatorUp, actuatorDown, augerDuration, blowerDuration'
+                }), 400
+
+            # Validate parameter types and values
+            try:
+                feed_size = int(feed_size)
+                actuator_up = int(actuator_up)
+                actuator_down = int(actuator_down)
+                auger_duration = int(auger_duration)
+                blower_duration = int(blower_duration)
+            except (ValueError, TypeError):
+                return jsonify({
+                    'status': 'error',
+                    'message': 'All parameters must be integers'
+                }), 400
+
+            # Validate parameter ranges
+            if any([
+                feed_size < 0,
+                actuator_up < 0,
+                actuator_down < 0,
+                auger_duration < 0,
+                blower_duration < 0
+            ]):
+                return jsonify({
+                    'status': 'error',
+                    'message': 'All parameters must be non-negative integers'
+                }), 400
+
+            # Validate reasonable maximum values (safety limits)
+            max_duration = 300  # 5 minutes max for any single operation
+            if any([
+                actuator_up > max_duration,
+                actuator_down > max_duration,
+                auger_duration > max_duration,
+                blower_duration > max_duration
+            ]):
+                return jsonify({
+                    'status': 'error',
+                    'message': f'Duration parameters cannot exceed {max_duration} seconds for safety'
+                }), 400
+
+            # Start the feeder process
+            result = self.feeder_service.start(
+                feed_size=feed_size,
+                actuator_up=actuator_up,
+                actuator_down=actuator_down,
+                auger_duration=auger_duration,
+                blower_duration=blower_duration
+            )
+
+            if result['status'] == 'success':
+                return jsonify(result)
+            else:
+                return jsonify(result), 500
+
+        except Exception as e:
+            return jsonify({
+                'status': 'error',
+                'message': f'Error starting feeder process: {str(e)}'
             }), 500
 
     def sync_sensors_to_firebase(self):
