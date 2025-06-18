@@ -146,6 +146,60 @@ class FirebaseService:
             logger.error(f"Failed to retrieve sensor data from Firebase: {str(e)}")
             return {'error': str(e)}
 
+    def sync_schedule_data(self) -> Dict[str, Any]:
+        """
+        Sync schedule data from Firebase to local schedule_data.jsonc file
+        
+        Returns:
+            Dictionary containing sync status and result
+        """
+        try:
+            # Get schedule data from Firebase
+            ref = db.reference('/schedule_data')
+            firebase_data = ref.get()
+            
+            if firebase_data is None:
+                logger.warning("No schedule data found in Firebase")
+                return {
+                    'status': 'warning',
+                    'message': 'No schedule data found in Firebase',
+                    'data_synced': False
+                }
+            
+            # Prepare data structure for local file
+            local_data = {
+                'schedule_data': firebase_data,
+                'last_synced': datetime.datetime.now().isoformat(),
+                'sync_source': 'firebase'
+            }
+            
+            # Save to local file
+            schedule_file = Path(__file__).parent.parent / 'data' / 'schedule_data.jsonc'
+            
+            with open(schedule_file, 'w', encoding='utf-8') as f:
+                # Write as pretty-formatted JSON
+                json.dump(local_data, f, indent=2, ensure_ascii=False)
+            
+            logger.info(f"Successfully synced schedule data from Firebase to {schedule_file}")
+            
+            return {
+                'status': 'success',
+                'message': 'Schedule data synced successfully from Firebase',
+                'data_synced': True,
+                'records_count': len(firebase_data) if isinstance(firebase_data, list) else 1,
+                'sync_timestamp': datetime.datetime.now().isoformat(),
+                'file_path': str(schedule_file)
+            }
+            
+        except Exception as e:
+            error_msg = f"Failed to sync schedule data from Firebase: {str(e)}"
+            logger.error(error_msg)
+            return {
+                'status': 'error',
+                'message': error_msg,
+                'data_synced': False
+            }
+
     def health_check(self) -> Dict[str, Any]:
         """
         Check Firebase connection health

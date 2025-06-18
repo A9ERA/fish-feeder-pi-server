@@ -247,6 +247,12 @@ curl -X GET http://localhost:5000/api/sensors/dissolved_oxygen
 curl -X POST http://localhost:5000/api/sensors/sync
 ```
 
+### Sync Schedule from Firebase
+```bash
+# Sync schedule data from Firebase to local file
+curl -X POST http://localhost:5000/api/schedule/sync
+```
+
 ## Testing Scripts
 
 ### Save as `test_all_endpoints.sh`
@@ -294,6 +300,10 @@ curl -s -X POST $BASE_URL/api/feeder/start \
     "blowerDuration": 1
   }' | jq .
 
+echo -e "\n5. Testing schedule sync..."
+curl -s -X POST $BASE_URL/api/schedule/sync \
+  -H "Content-Type: application/json" | jq .
+
 echo -e "\nAll tests completed!"
 ```
 
@@ -330,6 +340,26 @@ chmod +x test_all_endpoints.sh
    }
    ```
    - Solution: Wait for current process to complete or restart the server
+
+4. **Schedule Sync Error**
+   ```json
+   {
+     "status": "error",
+     "message": "Failed to sync schedule data from Firebase: Connection timeout"
+   }
+   ```
+   - Solution: Check Firebase connection and credentials
+   - Verify Firebase database rules allow read access to `/schedule_data`
+
+5. **No Schedule Data Warning**
+   ```json
+   {
+     "status": "warning",
+     "message": "No schedule data found in Firebase"
+   }
+   ```
+   - This is normal if no schedule data exists in Firebase yet
+   - Add data to Firebase `/schedule_data` reference first
 
 ### Debug Commands
 

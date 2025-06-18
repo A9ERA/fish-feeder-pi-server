@@ -53,6 +53,9 @@ class APIService:
         
         # Feeder control routes
         self.app.route('/api/feeder/start', methods=['POST'])(self.start_feeder)
+        
+        # Schedule sync routes
+        self.app.route('/api/schedule/sync', methods=['POST'])(self.sync_schedule_data)
 
     def index(self):
         """Render the main video streaming page"""
@@ -519,6 +522,26 @@ class APIService:
             return jsonify({
                 'status': 'error',
                 'message': f'Error starting feeder process: {str(e)}'
+            }), 500
+
+    def sync_schedule_data(self):
+        """Sync schedule data from Firebase to local file"""
+        try:
+            # Call firebase service to sync schedule data
+            result = self.firebase_service.sync_schedule_data()
+            
+            if result['status'] == 'success':
+                return jsonify(result)
+            elif result['status'] == 'warning':
+                return jsonify(result), 200  # Still successful, just no data
+            else:
+                return jsonify(result), 500
+                
+        except Exception as e:
+            return jsonify({
+                'status': 'error',
+                'message': f'Error syncing schedule data: {str(e)}',
+                'data_synced': False
             }), 500
 
     def sync_sensors_to_firebase(self):

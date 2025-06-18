@@ -284,6 +284,61 @@ curl -X POST http://localhost:5000/api/feeder/start \
 - Comprehensive error handling and logging
 - Device status checking before each operation
 
+### 6. Schedule Sync (New)
+**Endpoint:** `POST /api/schedule/sync`
+
+**Description:** 
+This endpoint syncs schedule data from Firebase Realtime Database to local storage file (`schedule_data.jsonc`). It retrieves data from Firebase reference `/schedule_data` and stores it locally for offline access.
+
+**Request Body:**
+```json
+// No request body required
+```
+
+**Examples:**
+```bash
+# Sync schedule data from Firebase
+curl -X POST http://localhost:5000/api/schedule/sync \
+  -H "Content-Type: application/json"
+```
+
+**Success Response:**
+```json
+{
+  "status": "success",
+  "message": "Schedule data synced successfully from Firebase",
+  "data_synced": true,
+  "records_count": 5,
+  "sync_timestamp": "2024-01-15T14:30:45.123456",
+  "file_path": "/path/to/pi-server/src/data/schedule_data.jsonc"
+}
+```
+
+**Warning Response (No Data):**
+```json
+{
+  "status": "warning",
+  "message": "No schedule data found in Firebase",
+  "data_synced": false
+}
+```
+
+**Error Response:**
+```json
+{
+  "status": "error",
+  "message": "Failed to sync schedule data from Firebase: Connection timeout",
+  "data_synced": false
+}
+```
+
+**Features:**
+- Pulls data from Firebase `/schedule_data` reference
+- Stores data in local `schedule_data.jsonc` file with metadata
+- Includes sync timestamp and source information
+- Handles cases when no data exists in Firebase
+- Comprehensive error handling for network/Firebase issues
+
 ## Response Format
 
 ### Success Response
