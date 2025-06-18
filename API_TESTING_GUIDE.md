@@ -253,6 +253,12 @@ curl -X POST http://localhost:5000/api/sensors/sync
 curl -X POST http://localhost:5000/api/schedule/sync
 ```
 
+### Sync Feed Presets from Firebase
+```bash
+# Sync feed preset data from Firebase to local file
+curl -X POST http://localhost:5000/api/feed-preset/sync
+```
+
 ## Testing Scripts
 
 ### Save as `test_all_endpoints.sh`
@@ -302,6 +308,10 @@ curl -s -X POST $BASE_URL/api/feeder/start \
 
 echo -e "\n5. Testing schedule sync..."
 curl -s -X POST $BASE_URL/api/schedule/sync \
+  -H "Content-Type: application/json" | jq .
+
+echo -e "\n6. Testing feed preset sync..."
+curl -s -X POST $BASE_URL/api/feed-preset/sync \
   -H "Content-Type: application/json" | jq .
 
 echo -e "\nAll tests completed!"
@@ -360,6 +370,26 @@ chmod +x test_all_endpoints.sh
    ```
    - This is normal if no schedule data exists in Firebase yet
    - Add data to Firebase `/schedule_data` reference first
+
+6. **Feed Preset Sync Error**
+   ```json
+   {
+     "status": "error",
+     "message": "Failed to sync feed preset data from Firebase: Connection timeout"
+   }
+   ```
+   - Solution: Check Firebase connection and credentials
+   - Verify Firebase database rules allow read access to `/feed_preset`
+
+7. **No Feed Preset Data Warning**
+   ```json
+   {
+     "status": "warning",
+     "message": "No feed preset data found in Firebase"
+   }
+   ```
+   - This is normal if no feed preset data exists in Firebase yet
+   - Add preset configurations to Firebase `/feed_preset` reference first
 
 ### Debug Commands
 

@@ -339,6 +339,92 @@ curl -X POST http://localhost:5000/api/schedule/sync \
 - Handles cases when no data exists in Firebase
 - Comprehensive error handling for network/Firebase issues
 
+### 7. Feed Preset Sync (New)
+**Endpoint:** `POST /api/feed-preset/sync`
+
+**Description:** 
+This endpoint syncs feed preset data from Firebase Realtime Database to local storage file (`feed_preset_data.jsonc`). It retrieves feeding preset configurations from Firebase reference `/feed_preset` and stores them locally for quick access during feeding operations.
+
+**Request Body:**
+```json
+// No request body required
+```
+
+**Examples:**
+```bash
+# Sync feed preset data from Firebase
+curl -X POST http://localhost:5000/api/feed-preset/sync \
+  -H "Content-Type: application/json"
+```
+
+**Success Response:**
+```json
+{
+  "status": "success",
+  "message": "Feed preset data synced successfully from Firebase",
+  "data_synced": true,
+  "records_count": 3,
+  "sync_timestamp": "2024-01-15T14:30:45.123456",
+  "file_path": "/path/to/pi-server/src/data/feed_preset_data.jsonc"
+}
+```
+
+**Warning Response (No Data):**
+```json
+{
+  "status": "warning",
+  "message": "No feed preset data found in Firebase",
+  "data_synced": false
+}
+```
+
+**Error Response:**
+```json
+{
+  "status": "error",
+  "message": "Failed to sync feed preset data from Firebase: Connection timeout",
+  "data_synced": false
+}
+```
+
+**Sample Feed Preset Structure:**
+```json
+[
+  {
+    "id": "quick_feed",
+    "name": "Quick Feed",
+    "feedSize": 50,
+    "actuatorUp": 2,
+    "actuatorDown": 1,
+    "augerDuration": 5,
+    "blowerDuration": 3,
+    "description": "Fast feeding for small portions",
+    "enabled": true,
+    "created_at": "2024-01-15T10:00:00.000Z"
+  },
+  {
+    "id": "standard_feed",
+    "name": "Standard Feed", 
+    "feedSize": 100,
+    "actuatorUp": 3,
+    "actuatorDown": 2,
+    "augerDuration": 8,
+    "blowerDuration": 7,
+    "description": "Normal feeding preset",
+    "enabled": true,
+    "created_at": "2024-01-15T10:00:00.000Z"
+  }
+]
+```
+
+**Features:**
+- Pulls data from Firebase `/feed_preset` reference
+- Stores preset configurations for feeding operations
+- Compatible with `/api/feeder/start` endpoint parameters
+- Includes metadata with sync timestamp and source
+- Handles empty preset collections gracefully
+- Error handling for Firebase connectivity issues
+
 ## Response Format
 
 ### Success Response

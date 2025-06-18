@@ -200,6 +200,60 @@ class FirebaseService:
                 'data_synced': False
             }
 
+    def sync_feed_preset_data(self) -> Dict[str, Any]:
+        """
+        Sync feed preset data from Firebase to local feed_preset_data.jsonc file
+        
+        Returns:
+            Dictionary containing sync status and result
+        """
+        try:
+            # Get feed preset data from Firebase
+            ref = db.reference('/feed_preset')
+            firebase_data = ref.get()
+            
+            if firebase_data is None:
+                logger.warning("No feed preset data found in Firebase")
+                return {
+                    'status': 'warning',
+                    'message': 'No feed preset data found in Firebase',
+                    'data_synced': False
+                }
+            
+            # Prepare data structure for local file
+            local_data = {
+                'feed_preset_data': firebase_data,
+                'last_synced': datetime.datetime.now().isoformat(),
+                'sync_source': 'firebase'
+            }
+            
+            # Save to local file
+            preset_file = Path(__file__).parent.parent / 'data' / 'feed_preset_data.jsonc'
+            
+            with open(preset_file, 'w', encoding='utf-8') as f:
+                # Write as pretty-formatted JSON
+                json.dump(local_data, f, indent=2, ensure_ascii=False)
+            
+            logger.info(f"Successfully synced feed preset data from Firebase to {preset_file}")
+            
+            return {
+                'status': 'success',
+                'message': 'Feed preset data synced successfully from Firebase',
+                'data_synced': True,
+                'records_count': len(firebase_data) if isinstance(firebase_data, list) else 1,
+                'sync_timestamp': datetime.datetime.now().isoformat(),
+                'file_path': str(preset_file)
+            }
+            
+        except Exception as e:
+            error_msg = f"Failed to sync feed preset data from Firebase: {str(e)}"
+            logger.error(error_msg)
+            return {
+                'status': 'error',
+                'message': error_msg,
+                'data_synced': False
+            }
+
     def health_check(self) -> Dict[str, Any]:
         """
         Check Firebase connection health

@@ -56,6 +56,9 @@ class APIService:
         
         # Schedule sync routes
         self.app.route('/api/schedule/sync', methods=['POST'])(self.sync_schedule_data)
+        
+        # Feed preset sync routes
+        self.app.route('/api/feed-preset/sync', methods=['POST'])(self.sync_feed_preset_data)
 
     def index(self):
         """Render the main video streaming page"""
@@ -541,6 +544,26 @@ class APIService:
             return jsonify({
                 'status': 'error',
                 'message': f'Error syncing schedule data: {str(e)}',
+                'data_synced': False
+            }), 500
+
+    def sync_feed_preset_data(self):
+        """Sync feed preset data from Firebase to local file"""
+        try:
+            # Call firebase service to sync feed preset data
+            result = self.firebase_service.sync_feed_preset_data()
+            
+            if result['status'] == 'success':
+                return jsonify(result)
+            elif result['status'] == 'warning':
+                return jsonify(result), 200  # Still successful, just no data
+            else:
+                return jsonify(result), 500
+                
+        except Exception as e:
+            return jsonify({
+                'status': 'error',
+                'message': f'Error syncing feed preset data: {str(e)}',
                 'data_synced': False
             }), 500
 
