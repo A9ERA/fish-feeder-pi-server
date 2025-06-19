@@ -64,6 +64,8 @@ class FeederService:
                 raise Exception("Failed to stop actuator after up movement")
             print(f"[Feeder Service] Step 1 completed: Actuator up movement finished")
 
+            time.sleep(1)
+            
             # Step 2: Actuator motor down
             print(f"[Feeder Service] Step 2: Moving actuator down for {actuator_down} seconds")
             if not self.control_service.control_actuator_motor('down'):
