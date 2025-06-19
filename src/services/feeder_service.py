@@ -75,27 +75,53 @@ class FeederService:
                 raise Exception("Failed to stop actuator after down movement")
             print(f"[Feeder Service] Step 2 completed: Actuator down movement finished")
 
-            # Step 3: Auger forward
-            print(f"[Feeder Service] Step 3: Running auger forward for {auger_duration} seconds")
+            # Step 3 & 4: Start auger and blower simultaneously
+            print(f"[Feeder Service] Step 3 & 4: Starting auger (forward) and blower simultaneously")
+            print(f"Auger duration: {auger_duration}s, Blower duration: {blower_duration}s")
+            
+            # Start both devices
             if not self.control_service.control_auger('forward'):
                 raise Exception("Failed to start auger forward")
             
-            time.sleep(auger_duration)
-            
-            if not self.control_service.control_auger('stop'):
-                raise Exception("Failed to stop auger")
-            print(f"[Feeder Service] Step 3 completed: Auger operation finished")
-
-            # Step 4: Blower start
-            print(f"[Feeder Service] Step 4: Running blower for {blower_duration} seconds")
             if not self.control_service.control_blower('start'):
                 raise Exception("Failed to start blower")
             
-            time.sleep(blower_duration)
+            # Create functions to stop each device after their respective durations
+            auger_stopped = threading.Event()
+            blower_stopped = threading.Event()
             
-            if not self.control_service.control_blower('stop'):
-                raise Exception("Failed to stop blower")
-            print(f"[Feeder Service] Step 4 completed: Blower operation finished")
+            def stop_auger():
+                time.sleep(auger_duration)
+                if not self.control_service.control_auger('stop'):
+                    print(f"[Feeder Service] Warning: Failed to stop auger")
+                else:
+                    print(f"[Feeder Service] Auger operation finished after {auger_duration}s")
+                auger_stopped.set()
+            
+            def stop_blower():
+                time.sleep(blower_duration)
+                if not self.control_service.control_blower('stop'):
+                    print(f"[Feeder Service] Warning: Failed to stop blower")
+                else:
+                    print(f"[Feeder Service] Blower operation finished after {blower_duration}s")
+                blower_stopped.set()
+            
+            # Start timer threads for stopping each device
+            auger_thread = threading.Thread(target=stop_auger)
+            blower_thread = threading.Thread(target=stop_blower)
+            
+            auger_thread.start()
+            blower_thread.start()
+            
+            # Wait for both operations to complete
+            auger_stopped.wait()
+            blower_stopped.wait()
+            
+            # Wait for threads to finish
+            auger_thread.join()
+            blower_thread.join()
+            
+            print(f"[Feeder Service] Step 3 & 4 completed: Both auger and blower operations finished")
 
             print(f"[Feeder Service] Feeding process completed successfully!")
             
@@ -107,8 +133,7 @@ class FeederService:
                 'steps_completed': [
                     f"Actuator up: {actuator_up}s",
                     f"Actuator down: {actuator_down}s", 
-                    f"Auger forward: {auger_duration}s",
-                    f"Blower: {blower_duration}s"
+                    f"Auger forward & Blower (simultaneous): {auger_duration}s & {blower_duration}s"
                 ]
             }
 
