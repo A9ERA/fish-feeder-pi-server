@@ -184,6 +184,68 @@ curl -X POST http://localhost:5000/api/feeder/start \
 }
 ```
 
+## Scheduler Tests
+
+### Test 1: Check Scheduler Status
+```bash
+curl -X GET http://localhost:5000/api/scheduler/status
+```
+
+Expected response when running:
+```json
+{
+  "status": "success",
+  "message": "Scheduler status retrieved successfully",
+  "scheduler_status": {
+    "running": true,
+    "current_settings": {
+      "syncSensors": 10,
+      "syncSchedule": 10,
+      "syncFeedPreset": 10
+    },
+    "active_jobs": ["syncSensors", "syncSchedule", "syncFeedPreset", "settings_monitor"],
+    "thread_count": 4
+  }
+}
+```
+
+### Test 2: Manual Scheduler Control
+```bash
+# Stop scheduler
+curl -X POST http://localhost:5000/api/scheduler/stop \
+  -H "Content-Type: application/json"
+
+# Start scheduler
+curl -X POST http://localhost:5000/api/scheduler/start \
+  -H "Content-Type: application/json"
+```
+
+### Test 3: Update Scheduler Settings
+```bash
+# Update all intervals for faster testing
+curl -X POST http://localhost:5000/api/scheduler/update \
+  -H "Content-Type: application/json" \
+  -d '{
+    "syncSensors": 5,
+    "syncSchedule": 5,
+    "syncFeedPreset": 5
+  }'
+
+# Update only sensor sync interval
+curl -X POST http://localhost:5000/api/scheduler/update \
+  -H "Content-Type: application/json" \
+  -d '{
+    "syncSensors": 30
+  }'
+
+# Disable schedule sync
+curl -X POST http://localhost:5000/api/scheduler/update \
+  -H "Content-Type: application/json" \
+  -d '{
+    "syncSchedule": 0
+  }'
+```
+
 ## Error Testing
 
 ### Test Invalid Parameters
@@ -224,6 +286,13 @@ curl -X POST http://localhost:5000/api/feeder/start \
     "actuatorDown": 1,
     "augerDuration": 1,
     "blowerDuration": 1
+  }'
+
+# Invalid scheduler settings
+curl -X POST http://localhost:5000/api/scheduler/update \
+  -H "Content-Type: application/json" \
+  -d '{
+    "syncSensors": -5
   }'
 ```
 
@@ -314,13 +383,68 @@ echo -e "\n6. Testing feed preset sync..."
 curl -s -X POST $BASE_URL/api/feed-preset/sync \
   -H "Content-Type: application/json" | jq .
 
+echo -e "\n7. Testing scheduler status..."
+curl -s -X GET $BASE_URL/api/scheduler/status | jq .
+
+echo -e "\n8. Testing scheduler settings update..."
+curl -s -X POST $BASE_URL/api/scheduler/update \
+  -H "Content-Type: application/json" \
+  -d '{
+    "syncSensors": 15,
+    "syncSchedule": 15,
+    "syncFeedPreset": 15
+  }' | jq .
+
 echo -e "\nAll tests completed!"
+```
+
+### Save as `test_scheduler.sh`
+```bash
+#!/bin/bash
+
+BASE_URL="http://localhost:5000"
+
+echo "Testing Scheduler API..."
+echo "========================"
+
+echo "1. Get initial scheduler status..."
+curl -s -X GET $BASE_URL/api/scheduler/status | jq .scheduler_status
+
+echo -e "\n2. Update settings for faster testing..."
+curl -s -X POST $BASE_URL/api/scheduler/update \
+  -H "Content-Type: application/json" \
+  -d '{
+    "syncSensors": 5,
+    "syncSchedule": 5, 
+    "syncFeedPreset": 5
+  }' | jq .
+
+echo -e "\n3. Check updated status..."
+curl -s -X GET $BASE_URL/api/scheduler/status | jq .scheduler_status.current_settings
+
+echo -e "\n4. Stop scheduler..."
+curl -s -X POST $BASE_URL/api/scheduler/stop \
+  -H "Content-Type: application/json" | jq .
+
+echo -e "\n5. Check stopped status..."
+curl -s -X GET $BASE_URL/api/scheduler/status | jq .scheduler_status.running
+
+echo -e "\n6. Start scheduler again..."
+curl -s -X POST $BASE_URL/api/scheduler/start \
+  -H "Content-Type: application/json" | jq .
+
+echo -e "\n7. Final status check..."
+curl -s -X GET $BASE_URL/api/scheduler/status | jq .scheduler_status
+
+echo -e "\nScheduler tests completed!"
 ```
 
 ### Make executable and run:
 ```bash
 chmod +x test_all_endpoints.sh
+chmod +x test_scheduler.sh
 ./test_all_endpoints.sh
+./test_scheduler.sh
 ```
 
 ## Troubleshooting
@@ -391,6 +515,16 @@ chmod +x test_all_endpoints.sh
    - This is normal if no feed preset data exists in Firebase yet
    - Add preset configurations to Firebase `/feed_preset` reference first
 
+8. **Scheduler Service Error**
+   ```json
+   {
+     "status": "error",
+     "message": "Failed to start scheduler service"
+   }
+   ```
+   - Solution: Check Firebase connection
+   - Verify `/app_setting` exists in Firebase with proper structure
+
 ### Debug Commands
 
 ```bash
@@ -404,6 +538,9 @@ tail -f /path/to/server/logs
 curl -v -X POST http://localhost:5000/api/feeder/start \
   -H "Content-Type: application/json" \
   -d '{"feedSize": 10, "actuatorUp": 1, "actuatorDown": 1, "augerDuration": 1, "blowerDuration": 1}'
+
+# Monitor scheduler in real-time
+watch -n 2 'curl -s http://localhost:5000/api/scheduler/status | jq .scheduler_status'
 ```
 
 ## Tips for Testing
@@ -413,4 +550,6 @@ curl -v -X POST http://localhost:5000/api/feeder/start \
 3. **Use jq**: Install `jq` for pretty JSON formatting: `brew install jq` (macOS) or `sudo apt install jq` (Ubuntu)
 4. **Safety First**: Never exceed 300 seconds for any single operation
 5. **Sequential Testing**: Wait for one operation to complete before starting another
-6. **Emergency Stop**: Use relay "all off" command or restart server if needed 
+6. **Emergency Stop**: Use relay "all off" command or restart server if needed
+7. **Scheduler Monitoring**: Use `/api/scheduler/status` to monitor background sync operations
+8. **Firebase Verification**: Check Firebase console to verify data sync operations 

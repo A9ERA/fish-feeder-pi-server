@@ -11,6 +11,7 @@ from .control_service import ControlService
 from .firebase_service import FirebaseService
 from .sensor_data_service import SensorDataService
 from .feeder_service import FeederService
+from .scheduler_service import SchedulerService
 
 class APIService:
     def __init__(self, host='0.0.0.0', port=5000, serial_service=None):
@@ -28,6 +29,7 @@ class APIService:
         self.firebase_service = FirebaseService()  # Initialize Firebase service
         self.sensor_data_service = SensorDataService()  # Initialize sensor data service
         self.feeder_service = FeederService(self.control_service)  # Initialize feeder service
+        self.scheduler_service = SchedulerService(self.firebase_service, self)  # Initialize scheduler service
         
         # Health check route
         self.app.route('/')(self.index)
@@ -59,6 +61,12 @@ class APIService:
         
         # Feed preset sync routes
         self.app.route('/api/feed-preset/sync', methods=['POST'])(self.sync_feed_preset_data)
+        
+        # Scheduler control routes
+        self.app.route('/api/scheduler/status', methods=['GET'])(self.get_scheduler_status)
+        self.app.route('/api/scheduler/start', methods=['POST'])(self.start_scheduler)
+        self.app.route('/api/scheduler/stop', methods=['POST'])(self.stop_scheduler)
+        self.app.route('/api/scheduler/update', methods=['POST'])(self.update_scheduler_settings)
 
     def index(self):
         """Render the main video streaming page"""
@@ -600,6 +608,89 @@ class APIService:
             return jsonify({
                 'status': 'error',
                 'message': f'Error syncing sensor data: {str(e)}'
+            }), 500
+
+    def get_scheduler_status(self):
+        """Get scheduler status"""
+        try:
+            status = self.scheduler_service.get_status()
+            return jsonify({
+                'status': 'success',
+                'message': 'Scheduler status retrieved successfully',
+                'scheduler_status': status
+            })
+        except Exception as e:
+            return jsonify({
+                'status': 'error',
+                'message': f'Error retrieving scheduler status: {str(e)}'
+            }), 500
+
+    def start_scheduler(self):
+        """Start scheduler"""
+        try:
+            self.scheduler_service.start()
+            return jsonify({
+                'status': 'success',
+                'message': 'Scheduler started successfully'
+            })
+        except Exception as e:
+            return jsonify({
+                'status': 'error',
+                'message': f'Error starting scheduler: {str(e)}'
+            }), 500
+
+    def stop_scheduler(self):
+        """Stop scheduler"""
+        try:
+            self.scheduler_service.stop()
+            return jsonify({
+                'status': 'success',
+                'message': 'Scheduler stopped successfully'
+            })
+        except Exception as e:
+            return jsonify({
+                'status': 'error',
+                'message': f'Error stopping scheduler: {str(e)}'
+            }), 500
+
+    def update_scheduler_settings(self):
+        """Update scheduler sync intervals"""
+        try:
+            if not request.is_json:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Request must be JSON'
+                }), 400
+
+            data = request.get_json()
+            
+            # Extract sync interval parameters from request
+            new_settings = {}
+            if 'syncSensors' in data:
+                new_settings['syncSensors'] = data['syncSensors']
+            if 'syncSchedule' in data:
+                new_settings['syncSchedule'] = data['syncSchedule']
+            if 'syncFeedPreset' in data:
+                new_settings['syncFeedPreset'] = data['syncFeedPreset']
+
+            if not new_settings:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'At least one sync interval parameter is required: syncSensors, syncSchedule, syncFeedPreset'
+                }), 400
+
+            # Update scheduler settings
+            result = self.scheduler_service.update_settings_manually(new_settings)
+            
+            if result['status'] == 'success':
+                return jsonify(result)
+            else:
+                return jsonify(result), 500
+
+        except Exception as e:
+            return jsonify({
+                'status': 'error',
+                'message': f'Error updating scheduler settings: {str(e)}'
             }), 500
 
     def start(self):

@@ -171,7 +171,7 @@ curl -X POST http://localhost:5000/api/control/relay \
   -d '{"device": "all", "action": "off"}'
 ```
 
-### 5. Feeder Control (New)
+### 5. Feeder Control
 **Endpoint:** `POST /api/feeder/start`
 
 **Description:** 

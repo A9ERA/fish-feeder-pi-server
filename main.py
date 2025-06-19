@@ -12,6 +12,7 @@ sys.path.append(str(Path(__file__).parent / 'src'))
 from src.services.api_service import APIService
 from src.services.firebase_service import FirebaseService
 from src.services.serial_service import SerialService
+from src.config.settings import PORT
 
 def main():
     """Main function to start the server"""
@@ -39,16 +40,16 @@ def main():
             print(f"⚠️  Firebase connection issue: {health.get('error', 'Unknown error')}")
         
         # Initialize API service with serial service
-        api_service = APIService(host='0.0.0.0', port=5000, serial_service=serial_service)
+        api_service = APIService(host='0.0.0.0', port=PORT, serial_service=serial_service)
         # api_service = APIService(host='0.0.0.0', port=5000)
 
         
-        print("🌐 Server starting on http://0.0.0.0:5000")
+        print(f"🌐 Server starting on http://0.0.0.0:{PORT}")
         print("📋 Available endpoints:")
         print("  - GET  /health                    - Health check")
         print("  - GET  /api/sensors               - Get all sensors")
-        print("  - GET  /api/sensors/<name>        - Get specific sensor")
-        print("  - POST /api/sensors/sync          - Sync sensors data to Firebase")
+        print("  - GET  /api/sensors/<n>           - Get specific sensor")
+        print("  - POST /api/sensors/sync          - Sync to Firebase")
         print("  - POST /api/control/blower        - Control blower")
         print("  - POST /api/control/actuator      - Control actuator")
         print("  - POST /api/control/auger         - Control auger")
@@ -56,8 +57,22 @@ def main():
         print("  - POST /api/feeder/start          - Start feeding process")
         print("  - POST /api/schedule/sync         - Sync schedule from Firebase")
         print("  - POST /api/feed-preset/sync      - Sync feed presets from Firebase")
+        print("  - GET  /api/scheduler/status      - Get scheduler status")
+        print("  - POST /api/scheduler/start       - Start scheduler")
+        print("  - POST /api/scheduler/stop        - Stop scheduler")
+        print("  - POST /api/scheduler/update      - Update scheduler settings")
         print("\n🔥 Firebase sync endpoint: POST /api/sensors/sync")
-        print("💡 Test with: curl -X POST http://localhost:5000/api/sensors/sync")
+        print(f"💡 Test with: curl -X POST http://localhost:{PORT}/api/sensors/sync")
+        
+        # Start scheduler service
+        print("\n⏰ Starting Scheduler Service...")
+        try:
+            api_service.scheduler_service.start()
+            print("✅ Scheduler service started successfully")
+        except Exception as e:
+            print(f"⚠️  Failed to start scheduler service: {str(e)}")
+            print("💡 Server will continue without automated sync.")
+        
         print("\n" + "="*60)
         
         # Start the server
@@ -65,12 +80,20 @@ def main():
         
     except KeyboardInterrupt:
         print("\n🛑 Server stopped by user")
+        # Stop scheduler service
+        if 'api_service' in locals() and hasattr(api_service, 'scheduler_service'):
+            print("⏰ Stopping scheduler service...")
+            api_service.scheduler_service.stop()
+        # Stop serial service
         if 'serial_service' in locals() and serial_service:
             serial_service.stop()
     except Exception as e:
         print(f"❌ Error starting server: {str(e)}")
         import traceback
         traceback.print_exc()
+        # Stop services on error
+        if 'api_service' in locals() and hasattr(api_service, 'scheduler_service'):
+            api_service.scheduler_service.stop()
         if 'serial_service' in locals() and serial_service:
             serial_service.stop()
         sys.exit(1)

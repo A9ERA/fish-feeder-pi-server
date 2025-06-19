@@ -15,6 +15,7 @@ BAUD_RATE = int(os.getenv('BAUD_RATE', '9600'))
 APP_NAME = "FISH FEEDER - Pi Serial Server"
 DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
+PORT = int(os.getenv('PORT', '5000'))
 
 # Firebase Configuration
 FIREBASE_ADMIN_SDK_PATH = os.getenv('FIREBASE_ADMIN_SDK_PATH', 'fish-feeder-test-1-firebase-adminsdk.json')
