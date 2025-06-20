@@ -65,14 +65,11 @@ class MockFileOutput:
 
 # Try to import picamera2, fallback to mock if not available
 try:
-    # Only import if we're on a Raspberry Pi or explicitly enabled
-    is_raspberry_pi = os.path.exists('/proc/cpuinfo') and 'BCM' in open('/proc/cpuinfo').read()
-    enable_camera = os.getenv('ENABLE_CAMERA', 'auto').lower()
+    enable_camera = os.getenv('ENABLE_CAMERA', 'false').lower()
 
     print(f"[⌗][Video Stream Service] - enable_camera: {enable_camera}")
-    print(f"[⌗][Video Stream Service] - is_raspberry_pi: {is_raspberry_pi}")
     
-    if enable_camera == 'true' or (enable_camera == 'auto' and is_raspberry_pi):
+    if enable_camera == 'true':
         from picamera2 import Picamera2
         from picamera2.encoders import H264Encoder, MJPEGEncoder
         from picamera2.outputs import FileOutput, CircularOutput

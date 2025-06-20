@@ -62,7 +62,7 @@ class SensorDataService:
             with open(self.data_file_path, 'w') as f:
                 json5.dump(sensors_data, f, indent=4, quote_keys=True)
                 
-            print(f"[⌗][Sensor Data Service] - Updated data for sensor: {sensor_name}")
+            # print(f"[⌗][Sensor Data Service] - Updated data for sensor: {sensor_name}")
 
         except Exception as e:
             print(f"[❌][Sensor Data Service] Error: {e}")
