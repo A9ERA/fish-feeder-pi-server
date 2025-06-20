@@ -146,7 +146,7 @@ class SerialService:
                 json_data = data[8:]
                 data_dict = json.loads(json_data)
                 sensor_name = data_dict['name']
-                print(f"[⌗][Serial Service] - Processing data from sensor: {sensor_name}")
+                # print(f"[⌗][Serial Service] - Processing data from sensor: {sensor_name}")
                 self.sensor_data_service.update_sensor_data(sensor_name, data_dict['value'])
         except json.JSONDecodeError:
             print(f"Invalid JSON data received: {data}")

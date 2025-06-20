@@ -68,6 +68,9 @@ try:
     # Only import if we're on a Raspberry Pi or explicitly enabled
     is_raspberry_pi = os.path.exists('/proc/cpuinfo') and 'BCM' in open('/proc/cpuinfo').read()
     enable_camera = os.getenv('ENABLE_CAMERA', 'auto').lower()
+
+    print(f"[⌗][Video Stream Service] - enable_camera: {enable_camera}")
+    print(f"[⌗][Video Stream Service] - is_raspberry_pi: {is_raspberry_pi}")
     
     if enable_camera == 'true' or (enable_camera == 'auto' and is_raspberry_pi):
         from picamera2 import Picamera2
