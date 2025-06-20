@@ -1,5 +1,5 @@
 {
-    "last_updated": "2025-05-18 10:00:00",  // last updated timestamp of all sensors
+    "last_updated": "2025-05-18 10:00:00", // last updated timestamp of all sensors
     "sensors": {
         "DHT22_FEEDER": {
             "last_updated": "2025-05-18 10:00:00",
@@ -73,27 +73,51 @@
                 }
             ]
         },
-        "VOLTAGE_SYSTEM": {
+        "POWER_MONITOR": {
             "last_updated": "2025-05-18 10:00:00",
-            "description": "Voltage of the system",
+            "description": "Power monitor",
             "values": [
                 {
-                    "type": "voltage",
+                    "type": "solarVoltage",
                     "timestamp": "2025-05-18 10:00:00",
                     "unit": "V",
-                    "value": 12.0
-                }
-            ]
-        },
-        "CURRENT_SYSTEM": {
-            "last_updated": "2025-05-18 10:00:00",
-            "description": "Current of the system",
-            "values": [
+                    "value": 12.5
+                },
                 {
-                    "type": "current",
+                    "type": "solarCurrent",
                     "timestamp": "2025-05-18 10:00:00",
                     "unit": "A",
-                    "value": 1.0
+                    "value": 0.5
+                },
+                {
+                    "type": "loadVoltage",
+                    "timestamp": "2025-05-18 10:00:00",
+                    "unit": "V",
+                    "value": 12.5
+                },
+                {
+                    "type": "loadCurrent",
+                    "timestamp": "2025-05-18 10:00:00",
+                    "unit": "A",
+                    "value": 0.5
+                },
+                {
+                    "type": "batteryVoltage",
+                    "timestamp": "2025-05-18 10:00:00",
+                    "unit": "V",
+                    "value": 12.5
+                },
+                {
+                    "type": "batteryPercentage",
+                    "timestamp": "2025-05-18 10:00:00",
+                    "unit": "%",
+                    "value": 50
+                },
+                {
+                    "type": "batteryStatus",
+                    "timestamp": "2025-05-18 10:00:00",
+                    "unit": "string",
+                    "value": "charging"
                 }
             ]
         }
