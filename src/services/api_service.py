@@ -141,7 +141,10 @@ class APIService:
         try:
             # Try to read the sensors file as a basic health check
             with open(self.sensors_file, 'r') as f:
-                json5.loads(f.read())  # Use json5 instead of json for JSONC support
+                file_content = f.read().strip()
+                if not file_content:
+                    raise Exception("Sensor data file is empty")
+                json5.loads(file_content)  # Use json5 instead of json for JSONC support
                 
             uptime_seconds = int(time.time() - self.start_time)
             hours, remainder = divmod(uptime_seconds, 3600)

@@ -92,13 +92,21 @@ class SchedulerService:
         try:
             if self.settings_file.exists():
                 with open(self.settings_file, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
+                    file_content = f.read().strip()
+                    if not file_content:
+                        logger.warning("Settings file is empty, using defaults")
+                        return self._get_default_settings()
+                    data = json.loads(file_content)
                     if 'app_settings' in data and 'duration' in data['app_settings']:
                         return data['app_settings']['duration']
         except Exception as e:
             logger.error(f"Failed to load settings from file: {str(e)}")
         
         # Return default settings if file doesn't exist or is invalid
+        return self._get_default_settings()
+
+    def _get_default_settings(self) -> Dict[str, Any]:
+        """Get default settings"""
         return {
             'syncSensors': 10,
             'syncSchedule': 10,
@@ -176,11 +184,19 @@ class SchedulerService:
             
             # Read schedule data
             with open(schedule_file, 'r', encoding='utf-8') as f:
-                schedule_data = json5.load(f)
+                file_content = f.read().strip()
+                if not file_content:
+                    logger.warning("[Scheduler] Schedule data file is empty, skipping feed schedule job")
+                    return
+                schedule_data = json5.loads(file_content)
             
             # Read feed preset data
             with open(feed_preset_file, 'r', encoding='utf-8') as f:
-                feed_preset_data = json5.load(f)
+                file_content = f.read().strip()
+                if not file_content:
+                    logger.warning("[Scheduler] Feed preset data file is empty, skipping feed schedule job")
+                    return
+                feed_preset_data = json5.loads(file_content)
             
             if 'schedule_data' not in schedule_data or not isinstance(schedule_data['schedule_data'], list):
                 logger.warning("[Scheduler] Invalid schedule data format, skipping feed schedule job")

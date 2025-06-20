@@ -41,7 +41,14 @@ class SensorDataService:
             
             # Load existing data
             with open(self.data_file_path, 'r') as f:
-                sensors_data = json5.loads(f.read())
+                file_content = f.read().strip()
+                if not file_content:
+                    # Handle empty file case
+                    print(f"[❌][Sensor Data Service] Warning: Empty sensor data file, recreating...")
+                    self._ensure_data_file_exists()
+                    with open(self.data_file_path, 'r') as f2:
+                        file_content = f2.read().strip()
+                sensors_data = json5.loads(file_content)
 
             # Update sensor data
             current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -79,7 +86,14 @@ class SensorDataService:
             self._ensure_data_file_exists()
             
             with open(self.data_file_path, 'r') as f:
-                return json5.loads(f.read())
+                file_content = f.read().strip()
+                if not file_content:
+                    # Handle empty file case
+                    print(f"[❌][Sensor Data Service] Warning: Empty sensor data file, recreating...")
+                    self._ensure_data_file_exists()
+                    with open(self.data_file_path, 'r') as f2:
+                        file_content = f2.read().strip()
+                return json5.loads(file_content)
         except Exception as e:
             print(f"[❌][Sensor Data Service] Error: {e}")
             return {"error": str(e)} 
