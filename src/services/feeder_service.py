@@ -4,6 +4,7 @@ Feeder Service for controlling feeding process sequence
 import time
 import threading
 from typing import Optional
+from pathlib import Path
 from .control_service import ControlService
 from .feeder_history_service import FeederHistoryService
 from .video_stream_service import VideoStreamService
@@ -153,6 +154,8 @@ class FeederService:
             print(f"[Feeder Service] Feeding process completed successfully!")
             
             # Log successful feed operation
+            # Extract only filename from full path for CSV storage
+            video_filename = Path(video_file).name if video_file else ""
             self.history_service.log_feed_operation(
                 feed_size=feed_size,
                 actuator_up=actuator_up,
@@ -161,7 +164,7 @@ class FeederService:
                 blower_duration=blower_duration,
                 status='success',
                 message='Feeding process completed successfully',
-                video_file=video_file
+                video_file=video_filename
             )
             
             return {
@@ -190,6 +193,8 @@ class FeederService:
                 print(f"[Feeder Service] Warning: Failed to stop video recording on error: {video_error}")
             
             # Log failed feed operation
+            # Extract only filename from full path for CSV storage
+            video_filename = Path(video_file).name if video_file else ""
             self.history_service.log_feed_operation(
                 feed_size=feed_size,
                 actuator_up=actuator_up,
@@ -198,7 +203,7 @@ class FeederService:
                 blower_duration=blower_duration,
                 status='error',
                 message=error_msg,
-                video_file=video_file
+                video_file=video_filename
             )
             
             # Try to stop all devices in case of error
