@@ -7,7 +7,7 @@ import json
 import threading
 import queue
 import time
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Any
 from src.services.sensor_data_service import SensorDataService
 from src.config.settings import BAUD_RATE
 
@@ -189,7 +189,7 @@ class SerialService:
 
     def send_command(self, command: str) -> bool:
         """
-        Send a command to Arduino
+        Send a command to Arduino with auto-reconnection on failure
         
         Args:
             command: Command to send (without [control]: prefix)
@@ -199,20 +199,41 @@ class SerialService:
         """
         if not self.serial or not self.serial.is_open:
             print("❌ Serial connection not available")
-            return False
+            # Try to reconnect before giving up
+            if self._attempt_reconnection():
+                print("✅ Reconnected successfully, retrying command...")
+            else:
+                return False
             
         try:
             full_command = f"[control]:{command}\n"
             self.serial.write(full_command.encode('utf-8'))
             print(f"[Serial Service] Sent command: {full_command.strip()}")
             return True
+        except serial.SerialException as e:
+            print(f"❌ Serial error sending command: {e}")
+            print("🔄 Attempting to reconnect and retry...")
+            
+            # Try to reconnect and retry once
+            if self._attempt_reconnection():
+                try:
+                    full_command = f"[control]:{command}\n"
+                    self.serial.write(full_command.encode('utf-8'))
+                    print(f"[Serial Service] Sent command after reconnection: {full_command.strip()}")
+                    return True
+                except Exception as retry_e:
+                    print(f"❌ Failed to send command after reconnection: {retry_e}")
+                    return False
+            else:
+                print("❌ Failed to reconnect")
+                return False
         except Exception as e:
             print(f"❌ Error sending command: {e}")
             return False
 
     def send_command_with_response(self, command: str, timeout: float = 3.0) -> Dict:
         """
-        Send a command and wait for response
+        Send a command and wait for response with auto-reconnection on failure
         
         Args:
             command: Command to send (without [control]: prefix)
@@ -222,10 +243,15 @@ class SerialService:
             Dict with success status and response data
         """
         if not self.serial or not self.serial.is_open:
-            return {
-                'success': False,
-                'error': 'Serial connection not available'
-            }
+            print("❌ Serial connection not available")
+            # Try to reconnect before giving up
+            if self._attempt_reconnection():
+                print("✅ Reconnected successfully, retrying command...")
+            else:
+                return {
+                    'success': False,
+                    'error': 'Serial connection not available and reconnection failed'
+                }
             
         try:
             with self._command_lock:
@@ -273,15 +299,86 @@ class SerialService:
                 'error': 'Command timeout - no response received'
             }
             
+        except serial.SerialException as e:
+            print(f"❌ Serial error sending command with response: {e}")
+            print("🔄 Attempting to reconnect...")
+            
+            # Clean up pending command
+            with self._command_lock:
+                if command_id in self._pending_commands:
+                    del self._pending_commands[command_id]
+            
+            # Try to reconnect and retry once
+            if self._attempt_reconnection():
+                print("✅ Reconnected successfully, retrying command...")
+                return self.send_command_with_response(command, timeout)
+            else:
+                return {
+                    'success': False,
+                    'error': f'Serial error: {str(e)} and reconnection failed'
+                }
         except Exception as e:
             print(f"❌ Error sending command with response: {e}")
+            # Clean up pending command
+            with self._command_lock:
+                if command_id in self._pending_commands:
+                    del self._pending_commands[command_id]
             return {
                 'success': False,
                 'error': str(e)
             }
 
+    def check_connection_health(self) -> bool:
+        """
+        Check if the serial connection is healthy
+        
+        Returns:
+            bool: True if connection is healthy, False otherwise
+        """
+        try:
+            if not self.serial or not self.serial.is_open:
+                return False
+            
+            # Try to check if the port is still available
+            return True
+            
+        except Exception as e:
+            print(f"❌ Connection health check failed: {e}")
+            return False
+
+    def get_connection_status(self) -> Dict[str, Any]:
+        """
+        Get detailed connection status information
+        
+        Returns:
+            Dictionary with connection status details
+        """
+        status = {
+            'connected': False,
+            'port': self.port,
+            'baud_rate': self.baud_rate,
+            'is_open': False,
+            'healthy': False
+        }
+        
+        try:
+            if self.serial:
+                status['connected'] = True
+                status['is_open'] = self.serial.is_open
+                status['healthy'] = self.check_connection_health()
+            
+            return status
+            
+        except Exception as e:
+            status['error'] = str(e)
+            return status
+
     def read_serial_data(self):
-        """Read data from serial port in a loop"""
+        """Read data from serial port in a loop with auto-reconnection"""
+        reconnection_attempts = 0
+        max_reconnection_attempts = 5
+        reconnection_delay = 2  # seconds
+        
         while not self._stop_event.is_set():
             if self.serial and self.serial.is_open:
                 try:
@@ -289,15 +386,94 @@ class SerialService:
                         line = self.serial.readline().decode('utf-8', errors='ignore').strip()
                         if line:
                             self._process_data(line)
+                    # Reset reconnection attempts on successful read
+                    reconnection_attempts = 0
                 except serial.SerialException as e:
                     print(f"❌ Serial read error: {e}")
                     print("💡 Arduino may have been disconnected")
-                    break
+                    
+                    # Handle Input/output error and other serial exceptions
+                    print(f"🔄 Attempting to reconnect... (attempt {reconnection_attempts + 1}/{max_reconnection_attempts})")
+                    
+                    # Close current connection
+                    try:
+                        if self.serial and self.serial.is_open:
+                            self.serial.close()
+                    except:
+                        pass  # Ignore errors during disconnection
+                    
+                    self.serial = None
+                    
+                    # Wait before attempting reconnection
+                    time.sleep(reconnection_delay)
+                    
+                    # Try to reconnect
+                    if self._attempt_reconnection():
+                        print("✅ Successfully reconnected to Arduino!")
+                        reconnection_attempts = 0
+                        continue
+                    else:
+                        reconnection_attempts += 1
+                        if reconnection_attempts >= max_reconnection_attempts:
+                            print(f"❌ Failed to reconnect after {max_reconnection_attempts} attempts")
+                            print("🛑 Serial service will stop. Please check Arduino connection.")
+                            break
+                        else:
+                            print(f"⚠️ Reconnection failed. Will retry in {reconnection_delay} seconds...")
+                            time.sleep(reconnection_delay)
+                            
                 except Exception as e:
                     print(f"❌ Error reading serial data: {e}")
+                    # For non-serial exceptions, continue trying
+                    time.sleep(0.1)
                     continue
             else:
-                time.sleep(0.1)  # Prevent busy waiting when not connected
+                # No connection available, try to establish one
+                if reconnection_attempts < max_reconnection_attempts:
+                    print("🔄 No serial connection available, attempting to connect...")
+                    if self._attempt_reconnection():
+                        print("✅ Successfully connected to Arduino!")
+                        reconnection_attempts = 0
+                    else:
+                        reconnection_attempts += 1
+                        print(f"⚠️ Connection attempt {reconnection_attempts}/{max_reconnection_attempts} failed")
+                        time.sleep(reconnection_delay)
+                else:
+                    print("❌ Maximum reconnection attempts reached. Waiting...")
+                    time.sleep(10)  # Wait longer before trying again
+                    reconnection_attempts = 0  # Reset attempts after long wait
+                    
+    def _attempt_reconnection(self) -> bool:
+        """
+        Attempt to reconnect to Arduino
+        
+        Returns:
+            bool: True if reconnection successful, False otherwise
+        """
+        try:
+            # First try the current port
+            if self.port:
+                print(f"🔄 Trying to reconnect to {self.port}...")
+                if self._try_connect(self.port):
+                    return True
+            
+            # If current port fails, try to find Arduino again
+            print("🔍 Searching for Arduino device...")
+            new_port = self.find_arduino_port()
+            
+            if new_port:
+                if new_port != self.port:
+                    print(f"🔄 Found Arduino on different port: {new_port}")
+                    self.port = new_port
+                
+                if self._try_connect(self.port):
+                    return True
+            
+            return False
+            
+        except Exception as e:
+            print(f"❌ Error during reconnection attempt: {e}")
+            return False
 
     def _process_data(self, data: str):
         """
@@ -353,6 +529,24 @@ class SerialService:
         except Exception as e:
             print(f"❌ Error processing serial data: {e}")
 
+    def restart(self) -> bool:
+        """
+        Restart the serial service completely
+        
+        Returns:
+            bool: True if restart successful, False otherwise
+        """
+        print("🔄 Restarting Serial Service...")
+        
+        # Stop current service
+        self.stop()
+        
+        # Wait a bit for cleanup
+        time.sleep(1)
+        
+        # Start again
+        return self.start()
+
     def start(self):
         """Start the serial service"""
         print("🚀 Starting Serial Service...")
@@ -372,8 +566,10 @@ class SerialService:
         """Stop the serial service"""
         print("🛑 Stopping serial service...")
         self._stop_event.set()
-        if self.read_thread:
-            self.read_thread.join()
+        if self.read_thread and self.read_thread.is_alive():
+            self.read_thread.join(timeout=5)  # Add timeout to prevent hanging
+            if self.read_thread.is_alive():
+                print("⚠️ Read thread did not stop gracefully")
         self.disconnect()
         print("✅ Serial service stopped")
 
