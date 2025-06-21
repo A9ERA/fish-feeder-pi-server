@@ -63,7 +63,7 @@ sudo apt install ffmpeg -y
 ## 📊 การจัดเก็บข้อมูล
 
 ### CSV History
-ข้อมูลไฟล์วิดีโอจะถูกบันทึกใน CSV history พร้อม **video_file column ใหม่**:
+ข้อมูลไฟล์วิดีโอจะถูกบันทึกใน CSV history
 
 ```csv
 timestamp,amount_g,actuator_up_s,actuator_down_s,auger_duration_s,blower_duration_s,status,message,video_file

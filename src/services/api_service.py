@@ -81,6 +81,9 @@ class APIService:
         # Feed history routes
         self.app.route('/api/feed-history/<date>', methods=['GET'])(self.get_feed_history)
         self.app.route('/api/feed-history/available-dates', methods=['GET'])(self.get_feed_history_dates)
+        
+        # Video serving routes
+        self.app.route('/api/feed-video/<filename>', methods=['GET'])(self.serve_feed_video)
 
     def index(self):
         """Render the main video streaming page"""
@@ -842,6 +845,44 @@ class APIService:
                 'status': 'error',
                 'message': f'Error retrieving available dates: {str(e)}',
                 'dates': []
+            }), 500
+
+    def serve_feed_video(self, filename):
+        """Serve feed video file"""
+        try:
+            from flask import send_file, abort
+            import os
+            from pathlib import Path
+            
+            # Define video directory path
+            video_dir = Path(__file__).parent.parent / 'data' / 'history' / 'feeder-vdo'
+            video_path = video_dir / filename
+            
+            # Security check: ensure filename doesn't contain path traversal
+            if '..' in filename or '/' in filename or '\\' in filename:
+                abort(400, description="Invalid filename")
+            
+            # Check if file exists
+            if not video_path.exists():
+                abort(404, description="Video file not found")
+            
+            # Check file extension
+            allowed_extensions = {'.mp4', '.h264', '.avi', '.mov'}
+            if video_path.suffix.lower() not in allowed_extensions:
+                abort(400, description="Invalid file type")
+            
+            # Return video file
+            return send_file(
+                str(video_path),
+                mimetype='video/mp4',
+                as_attachment=False,
+                download_name=filename
+            )
+            
+        except Exception as e:
+            return jsonify({
+                'status': 'error',
+                'message': f'Error serving video file: {str(e)}'
             }), 500
 
     def control_sensor(self):
