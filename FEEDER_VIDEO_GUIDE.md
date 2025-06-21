@@ -47,9 +47,9 @@ sudo apt install ffmpeg -y
 ## 🎥 ข้อมูลเทคนิค
 
 ### การตั้งค่าวิดีโอ
-- **Resolution**: 500x500 pixels (streaming), 1280x720 (recording)
+- **Resolution**: 500x500 pixels (streaming)
 - **Frame Rate**: 30 FPS
-- **Bitrate**: 10 Mbps
+- **Bitrate**: 0.5 Mbps (ประหยัดพื้นที่)
 - **Encoder**: H264
 - **Container**: MP4
 

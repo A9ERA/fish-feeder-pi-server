@@ -332,7 +332,7 @@ class VideoStreamService:
             from picamera2.outputs import FileOutput
             
             # Create new encoder specifically for feeder recording
-            self.feeder_encoder = H264Encoder(bitrate=10000000)  # 10Mbps for good quality
+            self.feeder_encoder = H264Encoder(bitrate=500000)  # 0.5Mbps for smaller file size
             self.feeder_output = FileOutput(str(temp_h264_file))
             
             # Start recording using existing camera instance
