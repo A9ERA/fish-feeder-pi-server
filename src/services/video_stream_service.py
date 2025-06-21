@@ -318,6 +318,9 @@ class VideoStreamService:
         filename = f"{video_uuid}-{timestamp}.mp4"
         output_file = self.data_dir / filename
         
+        # Also create temporary H264 file
+        temp_h264_file = self.data_dir / f"{video_uuid}-{timestamp}.h264"
+        
         if USE_MOCK_CAMERA:
             # Create mock video file
             with open(output_file, 'w') as f:
@@ -330,28 +333,71 @@ class VideoStreamService:
             
             # Create new encoder specifically for feeder recording
             self.feeder_encoder = H264Encoder(bitrate=10000000)  # 10Mbps for good quality
-            self.feeder_output = FileOutput(str(output_file))
-            self.feeder_encoder.output = [self.feeder_output]
+            self.feeder_output = FileOutput(str(temp_h264_file))
             
-            # Start recording
-            self.picam2.start_encoder(self.feeder_encoder)
-            print(f"🎬 Feeder recording started: {output_file}")
+            # Start recording using existing camera instance
+            self.picam2.start_encoder(self.feeder_encoder, self.feeder_output)
+            print(f"🎬 Feeder recording started (H264): {temp_h264_file}")
         
         self.current_feeder_recording = str(output_file)
+        self.current_temp_h264 = str(temp_h264_file)
         return str(output_file)
 
     def stop_feeder_recording(self):
-        """Stop feeder video recording"""
+        """Stop feeder video recording and convert to MP4"""
         if USE_MOCK_CAMERA:
             print("🛑 Mock feeder recording stopped")
         else:
             if hasattr(self, 'feeder_encoder'):
                 self.picam2.stop_encoder(self.feeder_encoder)
                 print("🛑 Feeder recording stopped")
+                
+                # Convert H264 to MP4 using ffmpeg
+                temp_h264 = getattr(self, 'current_temp_h264', None)
+                output_mp4 = getattr(self, 'current_feeder_recording', None)
+                
+                if temp_h264 and output_mp4 and os.path.exists(temp_h264):
+                    try:
+                        # Use ffmpeg to convert H264 to MP4
+                        ffmpeg_cmd = [
+                            'ffmpeg', '-y',  # -y to overwrite output file
+                            '-i', temp_h264,  # input H264 file
+                            '-c', 'copy',     # copy codec (no re-encoding)
+                            '-movflags', '+faststart',  # optimize for streaming
+                            output_mp4        # output MP4 file
+                        ]
+                        
+                        result = subprocess.run(ffmpeg_cmd, 
+                                              capture_output=True, 
+                                              text=True, 
+                                              timeout=30)
+                        
+                        if result.returncode == 0:
+                            print(f"✅ Successfully converted to MP4: {output_mp4}")
+                            # Remove temporary H264 file
+                            os.remove(temp_h264)
+                            print(f"🗑️  Removed temporary file: {temp_h264}")
+                        else:
+                            print(f"❌ FFmpeg conversion failed: {result.stderr}")
+                            # Keep H264 file as backup
+                            print(f"📁 H264 file kept as backup: {temp_h264}")
+                            
+                    except subprocess.TimeoutExpired:
+                        print("⏰ FFmpeg conversion timed out")
+                    except Exception as e:
+                        print(f"❌ Error during conversion: {e}")
         
         recording_file = getattr(self, 'current_feeder_recording', None)
+        
+        # Clean up attributes
         if hasattr(self, 'current_feeder_recording'):
             delattr(self, 'current_feeder_recording')
+        if hasattr(self, 'current_temp_h264'):
+            delattr(self, 'current_temp_h264')
+        if hasattr(self, 'feeder_encoder'):
+            delattr(self, 'feeder_encoder')
+        if hasattr(self, 'feeder_output'):
+            delattr(self, 'feeder_output')
         
         return recording_file
 
