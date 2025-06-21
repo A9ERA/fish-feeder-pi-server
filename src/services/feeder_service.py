@@ -5,6 +5,7 @@ import time
 import threading
 from typing import Optional
 from .control_service import ControlService
+from .feeder_history_service import FeederHistoryService
 
 class FeederService:
     def __init__(self, control_service: Optional[ControlService] = None):
@@ -15,6 +16,7 @@ class FeederService:
             control_service: ControlService instance for device control
         """
         self.control_service = control_service
+        self.history_service = FeederHistoryService()
         self._lock = threading.Lock()
         self.is_running = False
 
@@ -127,6 +129,17 @@ class FeederService:
 
             print(f"[Feeder Service] Feeding process completed successfully!")
             
+            # Log successful feed operation
+            self.history_service.log_feed_operation(
+                feed_size=feed_size,
+                actuator_up=actuator_up,
+                actuator_down=actuator_down,
+                auger_duration=auger_duration,
+                blower_duration=blower_duration,
+                status='success',
+                message='Feeding process completed successfully'
+            )
+            
             return {
                 'status': 'success',
                 'message': 'Feeding process completed successfully',
@@ -142,6 +155,17 @@ class FeederService:
         except Exception as e:
             error_msg = f"Feeding process failed: {str(e)}"
             print(f"[Feeder Service] Error: {error_msg}")
+            
+            # Log failed feed operation
+            self.history_service.log_feed_operation(
+                feed_size=feed_size,
+                actuator_up=actuator_up,
+                actuator_down=actuator_down,
+                auger_duration=auger_duration,
+                blower_duration=blower_duration,
+                status='error',
+                message=error_msg
+            )
             
             # Try to stop all devices in case of error
             try:

@@ -12,6 +12,8 @@ from .firebase_service import FirebaseService
 from .sensor_data_service import SensorDataService
 from .feeder_service import FeederService
 from .scheduler_service import SchedulerService
+from .chart_data_service import ChartDataService
+from .feeder_history_service import FeederHistoryService
 
 class APIService:
     def __init__(self, host='0.0.0.0', port=5000, serial_service=None):
@@ -30,6 +32,8 @@ class APIService:
         self.sensor_data_service = SensorDataService()  # Initialize sensor data service
         self.feeder_service = FeederService(self.control_service)  # Initialize feeder service
         self.scheduler_service = SchedulerService(self.firebase_service, self)  # Initialize scheduler service
+        self.chart_data_service = ChartDataService()  # Initialize chart data service
+        self.feeder_history_service = FeederHistoryService()  # Initialize feeder history service
         
         # Health check route
         self.app.route('/')(self.index)
@@ -52,6 +56,7 @@ class APIService:
         self.app.route('/api/control/actuator', methods=['POST'])(self.control_actuator_motor)
         self.app.route('/api/control/auger', methods=['POST'])(self.control_auger)
         self.app.route('/api/control/relay', methods=['POST'])(self.control_relay)
+        self.app.route('/api/control/sensor', methods=['POST'])(self.control_sensor)
         
         # Feeder control routes
         self.app.route('/api/feeder/start', methods=['POST'])(self.start_feeder)
@@ -67,6 +72,15 @@ class APIService:
         self.app.route('/api/scheduler/start', methods=['POST'])(self.start_scheduler)
         self.app.route('/api/scheduler/stop', methods=['POST'])(self.stop_scheduler)
         self.app.route('/api/scheduler/update', methods=['POST'])(self.update_scheduler_settings)
+        
+        # Chart data routes
+        self.app.route('/api/charts/power-flow/<date>', methods=['GET'])(self.get_power_flow_chart_data)
+        self.app.route('/api/charts/battery/<date>', methods=['GET'])(self.get_battery_chart_data)
+        self.app.route('/api/charts/available-dates', methods=['GET'])(self.get_available_chart_dates)
+        
+        # Feed history routes
+        self.app.route('/api/feed-history/<date>', methods=['GET'])(self.get_feed_history)
+        self.app.route('/api/feed-history/available-dates', methods=['GET'])(self.get_feed_history_dates)
 
     def index(self):
         """Render the main video streaming page"""
@@ -694,6 +708,253 @@ class APIService:
             return jsonify({
                 'status': 'error',
                 'message': f'Error updating scheduler settings: {str(e)}'
+            }), 500
+
+    def get_power_flow_chart_data(self, date):
+        """Get power flow chart data for a specific date"""
+        try:
+            # Get power flow data from chart data service
+            result = self.chart_data_service.get_power_flow_data(date)
+            
+            if result['error']:
+                return jsonify({
+                    'status': 'error',
+                    'message': result['error'],
+                    'data': []
+                }), 404
+            
+            return jsonify({
+                'status': 'success',
+                'message': f'Power flow data retrieved for {date}',
+                'date': result['date'],
+                'total_records': result['total_records'],
+                'data': result['data']
+            })
+            
+        except Exception as e:
+            return jsonify({
+                'status': 'error',
+                'message': f'Error retrieving power flow data: {str(e)}',
+                'data': []
+            }), 500
+
+    def get_battery_chart_data(self, date):
+        """Get battery level chart data for a specific date"""
+        try:
+            # Get battery data from chart data service
+            result = self.chart_data_service.get_battery_data(date)
+            
+            if result['error']:
+                return jsonify({
+                    'status': 'error',
+                    'message': result['error'],
+                    'data': []
+                }), 404
+            
+            return jsonify({
+                'status': 'success',
+                'message': f'Battery data retrieved for {date}',
+                'date': result['date'],
+                'total_records': result['total_records'],
+                'data': result['data']
+            })
+            
+        except Exception as e:
+            return jsonify({
+                'status': 'error',
+                'message': f'Error retrieving battery data: {str(e)}',
+                'data': []
+            }), 500
+
+    def get_available_chart_dates(self):
+        """Get list of available dates for chart data"""
+        try:
+            # Get available dates from chart data service
+            result = self.chart_data_service.get_available_dates()
+            
+            if result['error']:
+                return jsonify({
+                    'status': 'error',
+                    'message': result['error'],
+                    'dates': []
+                }), 500
+            
+            return jsonify({
+                'status': 'success',
+                'message': f'Found {len(result["dates"])} available dates',
+                'dates': result['dates']
+            })
+            
+        except Exception as e:
+            return jsonify({
+                'status': 'error',
+                'message': f'Error retrieving available dates: {str(e)}',
+                'dates': []
+            }), 500
+
+    def get_feed_history(self, date):
+        """Get feed history data for a specific date"""
+        try:
+            from datetime import datetime
+            
+            # Parse date string (DD-MM-YYYY format)
+            try:
+                date_obj = datetime.strptime(date, "%d-%m-%Y")
+            except ValueError:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Invalid date format. Use DD-MM-YYYY format (e.g., 21-06-2025)',
+                    'data': []
+                }), 400
+            
+            # Get feed history data
+            feed_logs = self.feeder_history_service.read_feed_history(date_obj)
+            
+            return jsonify({
+                'status': 'success',
+                'message': f'Feed history retrieved for {date}',
+                'date': date,
+                'total_records': len(feed_logs),
+                'data': feed_logs
+            })
+            
+        except Exception as e:
+            return jsonify({
+                'status': 'error',
+                'message': f'Error retrieving feed history: {str(e)}',
+                'data': []
+            }), 500
+
+    def get_feed_history_dates(self):
+        """Get list of available dates for feed history"""
+        try:
+            # Get available dates from feeder history service
+            dates = self.feeder_history_service.get_available_dates()
+            
+            return jsonify({
+                'status': 'success',
+                'message': f'Found {len(dates)} available dates',
+                'dates': dates
+            })
+            
+        except Exception as e:
+            return jsonify({
+                'status': 'error',
+                'message': f'Error retrieving available dates: {str(e)}',
+                'dates': []
+            }), 500
+
+    def control_sensor(self):
+        """Control sensor operations"""
+        try:
+            if not request.is_json:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Request must be JSON'
+                }), 400
+
+            data = request.get_json()
+            action = data.get('action')
+            
+            if not action:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Action is required'
+                }), 400
+
+            # Validate action
+            valid_actions = ['start', 'stop', 'interval', 'status']
+            if action not in valid_actions:
+                return jsonify({
+                    'status': 'error',
+                    'message': f'Invalid action. Must be one of: {", ".join(valid_actions)}'
+                }), 400
+
+            # Handle interval action (requires interval value)
+            if action == 'interval':
+                interval = data.get('interval')
+                if interval is None:
+                    return jsonify({
+                        'status': 'error',
+                        'message': 'Interval value is required for interval action'
+                    }), 400
+                
+                try:
+                    interval = int(interval)
+                    if interval < 0:
+                        raise ValueError("Interval must be positive")
+                except (ValueError, TypeError):
+                    return jsonify({
+                        'status': 'error',
+                        'message': 'Interval must be a positive integer'
+                    }), 400
+                
+                success = self.control_service.control_sensors(action, interval)
+                action_description = f'Set sensor interval to {interval}ms'
+                
+                if success:
+                    return jsonify({
+                        'status': 'success',
+                        'message': f'{action_description} command sent successfully',
+                        'action': action,
+                        'timestamp': time.strftime('%Y-%m-%d %H:%M:%S')
+                    })
+                else:
+                    return jsonify({
+                        'status': 'error',
+                        'message': f'Failed to send {action_description.lower()} command'
+                    }), 500
+                    
+            elif action == 'status':
+                # Handle status action (returns dict with status info)
+                result = self.control_service.control_sensors(action)
+                
+                if result.get('success'):
+                    response_data = {
+                        'status': 'success',
+                        'message': 'Sensor status retrieved successfully',
+                        'action': action,
+                        'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
+                        'sensor_status': result.get('status', 'UNKNOWN'),
+                        'is_running': result.get('is_running', False),
+                        'interval': result.get('interval', 0),
+                        'raw_responses': result.get('raw_responses', [])
+                    }
+                    return jsonify(response_data)
+                else:
+                    return jsonify({
+                        'status': 'error',
+                        'message': f'Failed to get sensor status: {result.get("error", "Unknown error")}',
+                        'action': action,
+                        'timestamp': time.strftime('%Y-%m-%d %H:%M:%S')
+                    }), 500
+                    
+            else:
+                # Handle start/stop actions
+                success = self.control_service.control_sensors(action)
+                action_descriptions = {
+                    'start': 'Start sensors',
+                    'stop': 'Stop sensors'
+                }
+                action_description = action_descriptions.get(action, f'Sensor {action}')
+
+                if success:
+                    return jsonify({
+                        'status': 'success',
+                        'message': f'{action_description} command sent successfully',
+                        'action': action,
+                        'timestamp': time.strftime('%Y-%m-%d %H:%M:%S')
+                    })
+                else:
+                    return jsonify({
+                        'status': 'error',
+                        'message': f'Failed to send {action_description.lower()} command'
+                    }), 500
+
+        except Exception as e:
+            return jsonify({
+                'status': 'error',
+                'message': f'Error controlling sensor: {str(e)}'
             }), 500
 
     def start(self):

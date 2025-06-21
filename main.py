@@ -61,6 +61,9 @@ def main():
         print("  - POST /api/scheduler/start       - Start scheduler")
         print("  - POST /api/scheduler/stop        - Stop scheduler")
         print("  - POST /api/scheduler/update      - Update scheduler settings")
+        print("  - GET  /api/charts/power-flow/<date> - Get power flow chart data")
+        print("  - GET  /api/charts/battery/<date>    - Get battery level chart data")
+        print("  - GET  /api/charts/available-dates   - Get available chart dates")
         print("\n🔥 Firebase sync endpoint: POST /api/sensors/sync")
         print(f"💡 Test with: curl -X POST http://localhost:{PORT}/api/sensors/sync")
         

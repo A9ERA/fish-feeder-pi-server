@@ -11,6 +11,7 @@ import datetime
 import json5  # Add json5 for JSONC support
 from firebase_admin import db
 from .firebase_service import FirebaseService
+from .sensor_history_service import SensorHistoryService
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,7 @@ class SchedulerService:
         """
         self.firebase_service = firebase_service or FirebaseService()
         self.api_service = api_service
+        self.sensor_history_service = SensorHistoryService()
         self._running = False
         self._threads = {}
         self._stop_events = {}
@@ -158,6 +160,53 @@ class SchedulerService:
         """Clean up old executed schedules data to prevent memory buildup"""
         today = datetime.datetime.now().strftime("%Y-%m-%d")
         self._executed_schedules = {k: v for k, v in self._executed_schedules.items() if v == today}
+
+    def _sensor_history_job(self):
+        """Job function for saving sensor history data to CSV files"""
+        try:
+            logger.info("[Scheduler] Running sensor history save job...")
+            self.sensor_history_service.save_current_sensor_data()
+        except Exception as e:
+            logger.error(f"[Scheduler] Error in sensor history job: {str(e)}")
+
+    def _run_sensor_history_job_with_timing(self):
+        """Run sensor history job only on seconds divisible by 5"""
+        while not self._stop_events.get('sensorHistory', threading.Event()).is_set():
+            try:
+                current_time = datetime.datetime.now()
+                current_second = current_time.second
+                
+                # Check if current second is divisible by 5
+                if current_second % 5 == 0:
+                    self._sensor_history_job()
+                    # Sleep until the next 5-second mark to avoid running multiple times in the same second
+                    next_run_second = ((current_second // 5) + 1) * 5
+                    if next_run_second >= 60:
+                        next_run_second = 0
+                    
+                    # Calculate sleep time
+                    if next_run_second == 0:
+                        # Next run is at the top of the next minute
+                        sleep_time = 60 - current_second
+                    else:
+                        sleep_time = next_run_second - current_second
+                    
+                    # Sleep until next 5-second mark
+                    time.sleep(sleep_time)
+                else:
+                    # Sleep until the next 5-second mark
+                    next_run_second = ((current_second // 5) + 1) * 5
+                    if next_run_second >= 60:
+                        next_run_second = 0
+                        sleep_time = 60 - current_second
+                    else:
+                        sleep_time = next_run_second - current_second
+                    
+                    time.sleep(sleep_time)
+                    
+            except Exception as e:
+                logger.error(f"[Scheduler] Error in sensor history timing job: {str(e)}")
+                time.sleep(1)  # Sleep 1 second on error to prevent rapid loop
 
     def run_feed_schedule_job(self):
         """
@@ -351,6 +400,18 @@ class SchedulerService:
                 self._threads[job_name] = thread
                 thread.start()
                 logger.info(f"[Scheduler] Started {job_name} job with {interval}s interval")
+        
+        # Start sensor history job with special timing (every 5 seconds)
+        if 'sensorHistory' not in self._threads or not self._threads['sensorHistory'].is_alive():
+            self._stop_events['sensorHistory'] = threading.Event()
+            thread = threading.Thread(
+                target=self._run_sensor_history_job_with_timing,
+                name="Scheduler-sensorHistory",
+                daemon=True
+            )
+            self._threads['sensorHistory'] = thread
+            thread.start()
+            logger.info("[Scheduler] Started sensor history job (every 5 seconds when second % 5 == 0)")
 
     def _stop_all_jobs(self, exclude_current_thread=False):
         """Stop all scheduled jobs"""

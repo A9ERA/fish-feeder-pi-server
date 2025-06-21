@@ -38,4 +38,5 @@ logs/
 
 # Data files
 src/data/*.jsonc
+src/data/history/sensors
 !src/data/sensors_data.jsonc 
