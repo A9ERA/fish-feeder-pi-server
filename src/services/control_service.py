@@ -3,42 +3,31 @@ Control Service for sending commands to Arduino devices
 """
 import threading
 from typing import Optional
-from src.services.serial_service import SerialService
+from .serial_service import SerialService
 
 class ControlService:
     def __init__(self, serial_service: Optional[SerialService] = None):
         """
-        Initialize Control Service
+        Initialize Control Service with optional serial service
         
         Args:
-            serial_service: Optional SerialService instance. If None, creates a new one.
+            serial_service: SerialService instance for Arduino communication
         """
         self.serial_service = serial_service
         self._lock = threading.Lock()
 
     def _send_command(self, command: str) -> bool:
         """
-        Send a command to the Arduino via serial
+        Send a control command to Arduino
         
         Args:
-            command: Command string to send
-            
-        Returns:
-            bool: True if command sent successfully, False otherwise
+            command: Command to send (without [control]: prefix)
         """
-        if not self.serial_service or not self.serial_service.serial or not self.serial_service.serial.is_open:
-            print("Serial connection not available")
+        if not self.serial_service:
+            print("No serial service available")
             return False
-
-        try:
-            with self._lock:
-                full_command = f"[control]:{command}\n"
-                self.serial_service.serial.write(full_command.encode('utf-8'))
-                print(f"[Control Service] Sent command: {full_command.strip()}")
-                return True
-        except Exception as e:
-            print(f"Error sending command: {e}")
-            return False
+        
+        return self.serial_service.send_command(command)
 
     # Blower control methods
     def start_blower(self) -> bool:
@@ -246,66 +235,51 @@ class ControlService:
         return self._send_command(f"sensors:interval:{interval}")
 
     def sensors_status(self) -> dict:
-        """Get sensors status and read response from Arduino"""
-        if not self.serial_service or not self.serial_service.serial or not self.serial_service.serial.is_open:
+        """Get sensors status using proper command response system"""
+        if not self.serial_service or not self.serial_service.is_connected():
             return {
                 'success': False,
                 'error': 'Serial connection not available'
             }
 
         try:
-            with self._lock:
-                # Send status command
-                full_command = f"[control]:sensors:status\n"
-                self.serial_service.serial.write(full_command.encode('utf-8'))
-                print(f"[Control Service] Sent command: {full_command.strip()}")
+            # Use the new command-with-response system
+            result = self.serial_service.send_command_with_response("sensors:status", timeout=3.0)
+            
+            if result['success']:
+                response_lines = result['responses']
+                print(f"[Control Service] Received {len(response_lines)} response lines from Arduino")
                 
-                # Wait for response (Arduino sends 2 lines)
-                import time
-                time.sleep(0.5)  # Give Arduino time to respond
-                
+                # Parse the status information
                 status_info = {}
-                response_lines = []
-                
-                # Read available responses
-                timeout = time.time() + 2  # 2 second timeout
-                while time.time() < timeout:
-                    if self.serial_service.serial.in_waiting:
-                        line = self.serial_service.serial.readline().decode('utf-8').strip()
-                        if line and line.startswith('[INFO]'):
-                            response_lines.append(line)
-                            print(f"[Control Service] Arduino response: {line}")
-                            
-                            # Parse status information
-                            if 'Sensor service status:' in line:
-                                if 'ACTIVE' in line:
-                                    status_info['status'] = 'ACTIVE'
-                                    status_info['is_running'] = True
-                                else:
-                                    status_info['status'] = 'INACTIVE'
-                                    status_info['is_running'] = False
-                            elif 'Print interval:' in line:
-                                # Extract interval value (e.g., "Print interval: 1000ms")
-                                import re
-                                match = re.search(r'(\d+)ms', line)
-                                if match:
-                                    status_info['interval'] = int(match.group(1))
+                for line in response_lines:
+                    print(f"[Control Service] Arduino response: {line}")
                     
-                    time.sleep(0.1)  # Small delay between checks
+                    if 'Sensor service status:' in line:
+                        if 'ACTIVE' in line:
+                            status_info['status'] = 'ACTIVE'
+                            status_info['is_running'] = True
+                        else:
+                            status_info['status'] = 'INACTIVE'
+                            status_info['is_running'] = False
+                    elif 'Print interval:' in line:
+                        # Extract interval value (e.g., "Print interval: 1000ms")
+                        import re
+                        match = re.search(r'(\d+)ms', line)
+                        if match:
+                            status_info['interval'] = int(match.group(1))
                 
-                # If we got responses, return parsed info
-                if response_lines:
-                    return {
-                        'success': True,
-                        'raw_responses': response_lines,
-                        **status_info
-                    }
-                else:
-                    return {
-                        'success': False,
-                        'error': 'No response from Arduino'
-                    }
-                    
+                return {
+                    'success': True,
+                    'raw_responses': response_lines,
+                    **status_info
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': result.get('error', 'Unknown error')
+                }
+                
         except Exception as e:
             print(f"Error getting sensor status: {e}")
             return {

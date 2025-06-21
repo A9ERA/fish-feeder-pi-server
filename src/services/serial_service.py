@@ -5,7 +5,9 @@ import serial
 import serial.tools.list_ports
 import json
 import threading
-from typing import Optional
+import queue
+import time
+from typing import Optional, Dict, List
 from src.services.sensor_data_service import SensorDataService
 from src.config.settings import BAUD_RATE
 
@@ -25,6 +27,11 @@ class SerialService:
         self._stop_event = threading.Event()
         self.sensor_data_service = SensorDataService()
         self.read_thread = None
+        
+        # Command response handling
+        self._pending_commands = {}  # Dict to track pending commands
+        self._command_responses = queue.Queue()  # Queue for command responses
+        self._command_lock = threading.Lock()
 
     def find_arduino_port(self) -> Optional[str]:
         """
@@ -180,13 +187,106 @@ class SerialService:
             self.serial.close()
             print("🔌 Disconnected from serial port")
 
+    def send_command(self, command: str) -> bool:
+        """
+        Send a command to Arduino
+        
+        Args:
+            command: Command to send (without [control]: prefix)
+            
+        Returns:
+            bool: True if command sent successfully
+        """
+        if not self.serial or not self.serial.is_open:
+            print("❌ Serial connection not available")
+            return False
+            
+        try:
+            full_command = f"[control]:{command}\n"
+            self.serial.write(full_command.encode('utf-8'))
+            print(f"[Serial Service] Sent command: {full_command.strip()}")
+            return True
+        except Exception as e:
+            print(f"❌ Error sending command: {e}")
+            return False
+
+    def send_command_with_response(self, command: str, timeout: float = 3.0) -> Dict:
+        """
+        Send a command and wait for response
+        
+        Args:
+            command: Command to send (without [control]: prefix)
+            timeout: Timeout in seconds
+            
+        Returns:
+            Dict with success status and response data
+        """
+        if not self.serial or not self.serial.is_open:
+            return {
+                'success': False,
+                'error': 'Serial connection not available'
+            }
+            
+        try:
+            with self._command_lock:
+                # Generate unique command ID
+                command_id = f"{command}_{time.time()}"
+                
+                # Register command expectation
+                self._pending_commands[command_id] = {
+                    'command': command,
+                    'responses': [],
+                    'completed': False
+                }
+                
+                # Send command
+                full_command = f"[control]:{command}\n"
+                self.serial.write(full_command.encode('utf-8'))
+                print(f"[Serial Service] Sent command: {full_command.strip()}")
+                
+            # Wait for response
+            start_time = time.time()
+            while time.time() - start_time < timeout:
+                # Check if we have collected responses for this command
+                with self._command_lock:
+                    if command_id in self._pending_commands:
+                        cmd_data = self._pending_commands[command_id]
+                        if cmd_data['completed'] or len(cmd_data['responses']) > 0:
+                            responses = cmd_data['responses']
+                            del self._pending_commands[command_id]
+                            
+                            if responses:
+                                return {
+                                    'success': True,
+                                    'responses': responses
+                                }
+                
+                time.sleep(0.1)
+            
+            # Timeout occurred
+            with self._command_lock:
+                if command_id in self._pending_commands:
+                    del self._pending_commands[command_id]
+                    
+            return {
+                'success': False,
+                'error': 'Command timeout - no response received'
+            }
+            
+        except Exception as e:
+            print(f"❌ Error sending command with response: {e}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
+
     def read_serial_data(self):
         """Read data from serial port in a loop"""
         while not self._stop_event.is_set():
             if self.serial and self.serial.is_open:
                 try:
                     if self.serial.in_waiting:
-                        line = self.serial.readline().decode('utf-8').strip()
+                        line = self.serial.readline().decode('utf-8', errors='ignore').strip()
                         if line:
                             self._process_data(line)
                 except serial.SerialException as e:
@@ -196,6 +296,8 @@ class SerialService:
                 except Exception as e:
                     print(f"❌ Error reading serial data: {e}")
                     continue
+            else:
+                time.sleep(0.1)  # Prevent busy waiting when not connected
 
     def _process_data(self, data: str):
         """
@@ -227,11 +329,26 @@ class SerialService:
                 # print(f"[⌗][Serial Service] - Processing data from sensor: {sensor_name}")
                 self.sensor_data_service.update_sensor_data(sensor_name, data_dict['value'])
             elif data.startswith("[INFO]"):
-                # Print Arduino info messages for debugging
+                # Handle Arduino info messages (could be command responses)
                 print(f"[Arduino] {data}")
+                
+                # Check if this is a response to a pending command
+                with self._command_lock:
+                    for command_id, cmd_data in self._pending_commands.items():
+                        # For sensor status commands, collect INFO responses
+                        if 'sensors:status' in cmd_data['command']:
+                            cmd_data['responses'].append(data)
+                            # Mark as completed after getting both status lines
+                            if len(cmd_data['responses']) >= 2:
+                                cmd_data['completed'] = True
+            else:
+                # Handle other Arduino messages
+                if any(prefix in data for prefix in ["[ACTUATOR]", "[AUGER]", "[RELAY]", "[BLOWER]"]):
+                    print(f"[Arduino] {data}")
+                    
         except json.JSONDecodeError:
             # Don't spam with JSON errors for non-JSON Arduino messages
-            if not any(prefix in data for prefix in ["[ACTUATOR]", "[AUGER]", "[RELAY]", "[BLOWER]"]):
+            if not any(prefix in data for prefix in ["[ACTUATOR]", "[AUGER]", "[RELAY]", "[BLOWER]", "[INFO]"]):
                 print(f"⚠️ Invalid JSON data received: {data}")
         except Exception as e:
             print(f"❌ Error processing serial data: {e}")
