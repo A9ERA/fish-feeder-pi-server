@@ -34,19 +34,40 @@ class SerialService:
             str: Arduino port device path if found, None otherwise
         """
         ports = serial.tools.list_ports.comports()
-        for port in ports:
-            # เช็กจาก description หรือ VID/PID ที่มักใช้กับ Arduino
-            if ("Arduino" in port.description or 
-                "CH340" in port.description or 
-                "ttyUSB" in port.device or
-                "ttyACM" in port.device or
-                "FT232" in port.description or
-                "CP210" in port.description):
-                print(f"✅ Arduino found at {port.device} ({port.description})")
-                return port.device  # เช่น '/dev/ttyUSB0' หรือ '/dev/ttyUSB1'
+        if not ports:
+            print("❌ No serial ports found!")
+            print("💡 Troubleshooting:")
+            print("   • Make sure Arduino is connected via USB")
+            print("   • Try a different USB cable or port")
+            print("   • Install Arduino drivers if needed")
+            print("   • Check Device Manager (Windows) for unrecognized devices")
+            return None
+
+        print(f"🔍 Found {len(ports)} serial port(s):")
+        arduino_port = None
         
-        print("❌ No Arduino device found")
-        return None
+        for port in ports:
+            print(f"   📱 {port.device} - {port.description}")
+            
+            # Check for common Arduino identifiers
+            if (any(keyword in port.description.upper() for keyword in 
+                   ["ARDUINO", "CH340", "CH341", "FT232", "CP210", "USB SERIAL"]) or
+                any(keyword in port.device.upper() for keyword in 
+                   ["TTYUSB", "TTYACM", "COM"])):
+                print(f"      ⭐ Likely Arduino device!")
+                if not arduino_port:  # Use the first Arduino-like device found
+                    arduino_port = port.device
+        
+        if arduino_port:
+            print(f"✅ Selected Arduino port: {arduino_port}")
+            return arduino_port
+        else:
+            print("❌ No Arduino-like device found")
+            print("💡 If your Arduino is connected but not detected:")
+            print("   • Check if drivers are installed for your specific Arduino model")
+            print("   • Try connecting to a different USB port")
+            print("   • Verify the Arduino is powered on")
+            return None
 
     def list_available_ports(self):
         """
@@ -55,10 +76,16 @@ class SerialService:
         ports = serial.tools.list_ports.comports()
         print("\n📋 Available serial ports:")
         if not ports:
-            print("  No serial ports found")
+            print("  ❌ No serial ports found")
+            print("  💡 This usually means:")
+            print("     • Arduino is not connected")
+            print("     • USB drivers are not installed")
+            print("     • Arduino is not powered on")
         else:
             for port in ports:
                 print(f"  • {port.device} - {port.description}")
+                if port.vid and port.pid:
+                    print(f"    VID: {port.vid:04X}, PID: {port.pid:04X}")
         print()
 
     def connect(self) -> bool:
@@ -68,14 +95,27 @@ class SerialService:
         Returns:
             bool: True if connection successful, False otherwise
         """
-        # Try to find Arduino port if current port doesn't work
-        if not self._try_connect(self.port):
-            print(f"Failed to connect to {self.port}, searching for Arduino...")
-            arduino_port = self.find_arduino_port()
-            if arduino_port and arduino_port != self.port:
-                self.port = arduino_port
-                return self._try_connect(self.port)
+        if not self.port:
+            print("❌ No Arduino port available to connect to")
+            self.list_available_ports()
             return False
+            
+        # Try to connect to the current port
+        if not self._try_connect(self.port):
+            print(f"❌ Failed to connect to {self.port}")
+            
+            # Try to find Arduino port again
+            print("🔍 Searching for Arduino again...")
+            new_arduino_port = self.find_arduino_port()
+            
+            if new_arduino_port and new_arduino_port != self.port:
+                print(f"🔄 Trying new port: {new_arduino_port}")
+                self.port = new_arduino_port
+                return self._try_connect(self.port)
+            else:
+                print("❌ Unable to establish Arduino connection")
+                self._print_connection_troubleshooting()
+                return False
         return True
 
     def _try_connect(self, port: str) -> bool:
@@ -96,15 +136,49 @@ class SerialService:
             )
             print(f"✅ Connected to {port} at {self.baud_rate} baud")
             return True
-        except Exception as e:
+        except serial.SerialException as e:
             print(f"❌ Serial connection error on {port}: {e}")
+            if "Access is denied" in str(e) or "Permission denied" in str(e):
+                print("💡 This usually means another application is using the port")
+                print("   Try closing Arduino IDE, PuTTY, or other serial applications")
+            elif "could not open port" in str(e).lower():
+                print("💡 Port may not exist or Arduino disconnected")
             return False
+        except Exception as e:
+            print(f"❌ Unexpected connection error on {port}: {e}")
+            return False
+
+    def _print_connection_troubleshooting(self):
+        """Print comprehensive troubleshooting information"""
+        print("\n🔧 Arduino Connection Troubleshooting:")
+        print("=" * 50)
+        print("1. 🔌 Hardware Check:")
+        print("   • Verify Arduino is connected via USB cable")
+        print("   • Try a different USB cable (data cable, not charge-only)")
+        print("   • Try a different USB port")
+        print("   • Check if Arduino power LED is on")
+        
+        print("\n2. 💾 Software Check:")
+        print("   • Make sure Arduino is programmed with fish-feeder code")
+        print("   • Verify Arduino IDE can connect to the device")
+        print("   • Check Device Manager (Windows) for driver issues")
+        
+        print("\n3. 🐞 System Check:")
+        print("   • Close Arduino IDE if it's open")
+        print("   • Close any other applications using serial ports")
+        print("   • Try unplugging and reconnecting Arduino")
+        
+        print("\n4. 🛠️ Driver Check:")
+        print("   • Arduino Uno/Nano: Usually auto-detected")
+        print("   • ESP32/ESP8266: May need CP210x or CH34x drivers")
+        print("   • Chinese clones: Often need CH340G drivers")
+        print("=" * 50)
 
     def disconnect(self):
         """Disconnect from the serial port"""
         if self.serial and self.serial.is_open:
             self.serial.close()
-            print("Disconnected from serial port")
+            print("🔌 Disconnected from serial port")
 
     def read_serial_data(self):
         """Read data from serial port in a loop"""
@@ -115,8 +189,12 @@ class SerialService:
                         line = self.serial.readline().decode('utf-8').strip()
                         if line:
                             self._process_data(line)
+                except serial.SerialException as e:
+                    print(f"❌ Serial read error: {e}")
+                    print("💡 Arduino may have been disconnected")
+                    break
                 except Exception as e:
-                    print(f"Error reading serial data: {e}")
+                    print(f"❌ Error reading serial data: {e}")
                     continue
 
     def _process_data(self, data: str):
@@ -148,24 +226,23 @@ class SerialService:
                 sensor_name = data_dict['name']
                 # print(f"[⌗][Serial Service] - Processing data from sensor: {sensor_name}")
                 self.sensor_data_service.update_sensor_data(sensor_name, data_dict['value'])
+            elif data.startswith("[INFO]"):
+                # Print Arduino info messages for debugging
+                print(f"[Arduino] {data}")
         except json.JSONDecodeError:
-            print(f"Invalid JSON data received: {data}")
+            # Don't spam with JSON errors for non-JSON Arduino messages
+            if not any(prefix in data for prefix in ["[ACTUATOR]", "[AUGER]", "[RELAY]", "[BLOWER]"]):
+                print(f"⚠️ Invalid JSON data received: {data}")
         except Exception as e:
-            print(f"Error processing serial data: {e}")
+            print(f"❌ Error processing serial data: {e}")
 
     def start(self):
         """Start the serial service"""
-        print("🔍 Starting Serial Service...")
-        print(f"🎯 Target port: {self.port}")
+        print("🚀 Starting Serial Service...")
         
-        # List available ports for debugging
         if not self.connect():
             print("❌ Failed to establish serial connection")
-            self.list_available_ports()
-            print("💡 Please check:")
-            print("   • Arduino is connected via USB")
-            print("   • Arduino drivers are installed")
-            print("   • No other application is using the port")
+            print("🛑 Serial service startup failed")
             return False
 
         self._stop_event.clear()
@@ -176,8 +253,13 @@ class SerialService:
 
     def stop(self):
         """Stop the serial service"""
+        print("🛑 Stopping serial service...")
         self._stop_event.set()
         if self.read_thread:
             self.read_thread.join()
         self.disconnect()
-        print("Serial service stopped") 
+        print("✅ Serial service stopped")
+
+    def is_connected(self) -> bool:
+        """Check if serial connection is active"""
+        return self.serial is not None and self.serial.is_open 
