@@ -11,6 +11,7 @@ from datetime import datetime
 from threading import Condition
 import time
 from pathlib import Path
+import uuid
 
 # Mock classes for non-Raspberry Pi environments
 class MockPicamera2:
@@ -132,7 +133,10 @@ class VideoStreamService:
         self.video_dir = self.base_dir / 'video'
         self.sound_dir = self.base_dir / 'sound'
         
-        for directory in [self.pictures_dir, self.video_dir, self.sound_dir]:
+        # Create data directory for history
+        self.data_dir = Path(__file__).parent.parent / 'data' / 'history' / 'feeder-vdo'
+        
+        for directory in [self.pictures_dir, self.video_dir, self.sound_dir, self.data_dir]:
             directory.mkdir(parents=True, exist_ok=True)
         
         if USE_MOCK_CAMERA:
@@ -305,6 +309,51 @@ class VideoStreamService:
             print(f"🎤 Audio recording started: {output_file}")
         
         return str(output_file)
+
+    def start_feeder_recording(self):
+        """Start video recording specifically for feeder operation with UUID and timestamp filename"""
+        # Generate UUID and timestamp for filename
+        video_uuid = str(uuid.uuid4())
+        timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+        filename = f"{video_uuid}-{timestamp}.mp4"
+        output_file = self.data_dir / filename
+        
+        if USE_MOCK_CAMERA:
+            # Create mock video file
+            with open(output_file, 'w') as f:
+                f.write(f"Mock feeder video recording started at {timestamp}")
+            print(f"🎬 Mock feeder recording started: {output_file}")
+        else:
+            # Configure H264 encoder for high quality recording
+            from picamera2.encoders import H264Encoder
+            from picamera2.outputs import FileOutput
+            
+            # Create new encoder specifically for feeder recording
+            self.feeder_encoder = H264Encoder(bitrate=10000000)  # 10Mbps for good quality
+            self.feeder_output = FileOutput(str(output_file))
+            self.feeder_encoder.output = [self.feeder_output]
+            
+            # Start recording
+            self.picam2.start_encoder(self.feeder_encoder)
+            print(f"🎬 Feeder recording started: {output_file}")
+        
+        self.current_feeder_recording = str(output_file)
+        return str(output_file)
+
+    def stop_feeder_recording(self):
+        """Stop feeder video recording"""
+        if USE_MOCK_CAMERA:
+            print("🛑 Mock feeder recording stopped")
+        else:
+            if hasattr(self, 'feeder_encoder'):
+                self.picam2.stop_encoder(self.feeder_encoder)
+                print("🛑 Feeder recording stopped")
+        
+        recording_file = getattr(self, 'current_feeder_recording', None)
+        if hasattr(self, 'current_feeder_recording'):
+            delattr(self, 'current_feeder_recording')
+        
+        return recording_file
 
     def release(self):
         """Release camera resources"""

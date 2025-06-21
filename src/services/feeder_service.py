@@ -6,17 +6,20 @@ import threading
 from typing import Optional
 from .control_service import ControlService
 from .feeder_history_service import FeederHistoryService
+from .video_stream_service import VideoStreamService
 
 class FeederService:
-    def __init__(self, control_service: Optional[ControlService] = None):
+    def __init__(self, control_service: Optional[ControlService] = None, video_service: Optional[VideoStreamService] = None):
         """
         Initialize Feeder Service
         
         Args:
             control_service: ControlService instance for device control
+            video_service: VideoStreamService instance for video recording
         """
         self.control_service = control_service
         self.history_service = FeederHistoryService()
+        self.video_service = video_service or VideoStreamService()
         self._lock = threading.Lock()
         self.is_running = False
 
@@ -50,10 +53,18 @@ class FeederService:
             
             self.is_running = True
 
+        video_file = None
         try:
             print(f"[Feeder Service] Starting feeding process...")
             print(f"Feed size: {feed_size}g, Actuator up: {actuator_up}s, Actuator down: {actuator_down}s")
             print(f"Auger duration: {auger_duration}s, Blower duration: {blower_duration}s")
+
+            # Start video recording
+            try:
+                video_file = self.video_service.start_feeder_recording()
+                print(f"[Feeder Service] Video recording started: {video_file}")
+            except Exception as video_error:
+                print(f"[Feeder Service] Warning: Failed to start video recording: {video_error}")
 
             # Step 1: Actuator motor up
             print(f"[Feeder Service] Step 1: Moving actuator up for {actuator_up} seconds")
@@ -127,6 +138,14 @@ class FeederService:
             
             print(f"[Feeder Service] Step 3 & 4 completed: Both auger and blower operations finished")
 
+            # Stop video recording
+            try:
+                if video_file:
+                    final_video_file = self.video_service.stop_feeder_recording()
+                    print(f"[Feeder Service] Video recording stopped: {final_video_file}")
+            except Exception as video_error:
+                print(f"[Feeder Service] Warning: Failed to stop video recording: {video_error}")
+
             print(f"[Feeder Service] Feeding process completed successfully!")
             
             # Log successful feed operation
@@ -137,13 +156,15 @@ class FeederService:
                 auger_duration=auger_duration,
                 blower_duration=blower_duration,
                 status='success',
-                message='Feeding process completed successfully'
+                message='Feeding process completed successfully',
+                video_file=video_file
             )
             
             return {
                 'status': 'success',
                 'message': 'Feeding process completed successfully',
                 'feed_size': feed_size,
+                'video_file': video_file,
                 'total_duration': actuator_up + actuator_down + auger_duration + blower_duration,
                 'steps_completed': [
                     f"Actuator up: {actuator_up}s",
@@ -156,6 +177,14 @@ class FeederService:
             error_msg = f"Feeding process failed: {str(e)}"
             print(f"[Feeder Service] Error: {error_msg}")
             
+            # Stop video recording on error
+            try:
+                if video_file:
+                    self.video_service.stop_feeder_recording()
+                    print(f"[Feeder Service] Video recording stopped due to error")
+            except Exception as video_error:
+                print(f"[Feeder Service] Warning: Failed to stop video recording on error: {video_error}")
+            
             # Log failed feed operation
             self.history_service.log_feed_operation(
                 feed_size=feed_size,
@@ -164,7 +193,8 @@ class FeederService:
                 auger_duration=auger_duration,
                 blower_duration=blower_duration,
                 status='error',
-                message=error_msg
+                message=error_msg,
+                video_file=video_file
             )
             
             # Try to stop all devices in case of error
@@ -178,7 +208,8 @@ class FeederService:
 
             return {
                 'status': 'error',
-                'message': error_msg
+                'message': error_msg,
+                'video_file': video_file
             }
         
         finally:

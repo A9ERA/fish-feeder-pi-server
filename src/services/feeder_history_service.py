@@ -33,7 +33,8 @@ class FeederHistoryService:
                 'auger_duration_s': feed_data['auger_duration'],
                 'blower_duration_s': feed_data['blower_duration'],
                 'status': feed_data['status'],
-                'message': feed_data.get('message', '')
+                'message': feed_data.get('message', ''),
+                'video_file': feed_data.get('video_file', '')
             }
             
             # Write to CSV with proper line endings
@@ -68,7 +69,7 @@ class FeederHistoryService:
             print(f"[❌][Feeder History] Error writing CSV data: {e}")
     
     def log_feed_operation(self, feed_size: int, actuator_up: float, actuator_down: float, 
-                          auger_duration: float, blower_duration: float, status: str, message: str = ""):
+                          auger_duration: float, blower_duration: float, status: str, message: str = "", video_file: str = ""):
         """Log a feed operation to CSV file"""
         try:
             current_time = datetime.datetime.now()
@@ -92,7 +93,8 @@ class FeederHistoryService:
                 'auger_duration': auger_duration,
                 'blower_duration': blower_duration,
                 'status': status,
-                'message': message
+                'message': message,
+                'video_file': video_file
             }
             
             # Write data to CSV
@@ -141,7 +143,8 @@ class FeederHistoryService:
                             'auger_duration': float(row['auger_duration_s']),
                             'blower_duration': float(row['blower_duration_s']),
                             'status': row['status'],
-                            'message': row.get('message', '')
+                            'message': row.get('message', ''),
+                            'video_file': row.get('video_file', '')
                         }
                         feed_logs.append(feed_log)
                     except (ValueError, KeyError) as e:
