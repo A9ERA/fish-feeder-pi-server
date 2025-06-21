@@ -274,12 +274,17 @@ class ControlService:
                 if arduino_status:
                     status_info['status'] = arduino_status
                     status_info['is_running'] = (arduino_status == 'ACTIVE')
+                    print(f"[Control Service] DEBUG - Parsed status: {arduino_status}, is_running: {arduino_status == 'ACTIVE'}")
                 else:
                     status_info['status'] = 'UNKNOWN'
                     status_info['is_running'] = False
+                    print(f"[Control Service] DEBUG - No status found, setting to UNKNOWN")
                     
                 if arduino_interval:
                     status_info['interval'] = arduino_interval
+                    print(f"[Control Service] DEBUG - Parsed interval: {arduino_interval}")
+                
+                print(f"[Control Service] DEBUG - Final status_info: {status_info}")
                 
                 return {
                     'success': True,
