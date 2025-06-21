@@ -259,10 +259,10 @@ class ControlService:
                     print(f"[Control Service] Arduino response: {line}")
                     
                     if 'Sensor service status:' in line:
-                        if 'ACTIVE' in line:
-                            arduino_status = 'ACTIVE'
-                        else:
+                        if line.endswith('INACTIVE'):
                             arduino_status = 'INACTIVE'
+                        elif line.endswith('ACTIVE'):
+                            arduino_status = 'ACTIVE'
                     elif 'Print interval:' in line:
                         # Extract interval value (e.g., "Print interval: 1000ms")
                         import re
