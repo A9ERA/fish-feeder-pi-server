@@ -36,16 +36,33 @@ class FeederHistoryService:
                 'message': feed_data.get('message', '')
             }
             
-            # Write to CSV
+            # Write to CSV with proper line endings
+            # For existing files, ensure proper line ending by reading and checking last line
+            if not is_new_file and csv_path.exists():
+                try:
+                    with open(csv_path, 'rb') as check_file:
+                        check_file.seek(-1, 2)  # Go to last byte
+                        last_byte = check_file.read(1)
+                        if last_byte != b'\n':
+                            # File doesn't end with newline, add it
+                            with open(csv_path, 'a', encoding='utf-8') as fix_file:
+                                fix_file.write('\n')
+                except Exception as e:
+                    print(f"[⚠️][Feeder History] Could not fix line ending: {e}")
+            
             with open(csv_path, 'a', newline='', encoding='utf-8') as csvfile:
                 fieldnames = list(row_data.keys())
-                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames, lineterminator='\n')
                 
                 # Write header if it's a new file
                 if is_new_file:
                     writer.writeheader()
                 
                 writer.writerow(row_data)
+                
+                # Ensure data is written to disk immediately
+                csvfile.flush()
+                os.fsync(csvfile.fileno())
                 
         except Exception as e:
             print(f"[❌][Feeder History] Error writing CSV data: {e}")

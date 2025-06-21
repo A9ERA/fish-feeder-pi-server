@@ -214,13 +214,41 @@ class ControlService:
         return False
 
     # Sensor control methods
-    def sensors_start(self) -> bool:
-        """Start sensors"""
-        return self._send_command("sensors:start")
+    def sensors_start(self) -> dict:
+        """Start sensors and return status"""
+        success = self._send_command("sensors:start")
+        if success:
+            # Wait a moment for Arduino to process the command
+            import time
+            time.sleep(0.5)
+            # Get updated status
+            status = self.sensors_status()
+            status['command_success'] = True
+            return status
+        else:
+            return {
+                'success': False,
+                'command_success': False,
+                'error': 'Failed to send start command'
+            }
 
-    def sensors_stop(self) -> bool:
-        """Stop sensors"""
-        return self._send_command("sensors:stop")
+    def sensors_stop(self) -> dict:
+        """Stop sensors and return status"""
+        success = self._send_command("sensors:stop")
+        if success:
+            # Wait a moment for Arduino to process the command
+            import time
+            time.sleep(0.5)
+            # Get updated status
+            status = self.sensors_status()
+            status['command_success'] = True
+            return status
+        else:
+            return {
+                'success': False,
+                'command_success': False,
+                'error': 'Failed to send stop command'
+            }
 
     def sensors_set_interval(self, interval: int) -> bool:
         """
@@ -313,7 +341,7 @@ class ControlService:
             value: Value for interval setting (required for 'interval' action)
             
         Returns:
-            bool for start/stop/interval actions, dict for status action
+            dict for start/stop/status actions, bool for interval action
         """
         if action == "start":
             return self.sensors_start()

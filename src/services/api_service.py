@@ -930,25 +930,29 @@ class APIService:
                     }), 500
                     
             else:
-                # Handle start/stop actions
-                success = self.control_service.control_sensors(action)
+                # Handle start/stop actions (now returns dict with status)
+                result = self.control_service.control_sensors(action)
                 action_descriptions = {
                     'start': 'Start sensors',
                     'stop': 'Stop sensors'
                 }
                 action_description = action_descriptions.get(action, f'Sensor {action}')
 
-                if success:
+                if result.get('success') and result.get('command_success'):
                     return jsonify({
                         'status': 'success',
                         'message': f'{action_description} command sent successfully',
                         'action': action,
-                        'timestamp': time.strftime('%Y-%m-%d %H:%M:%S')
+                        'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
+                        'sensor_status': result.get('status', 'UNKNOWN'),
+                        'is_running': result.get('is_running', False),
+                        'interval': result.get('interval', 0)
                     })
                 else:
+                    error_msg = result.get('error', 'Unknown error') if isinstance(result, dict) else 'Command failed'
                     return jsonify({
                         'status': 'error',
-                        'message': f'Failed to send {action_description.lower()} command'
+                        'message': f'Failed to send {action_description.lower()} command: {error_msg}'
                     }), 500
 
         except Exception as e:
