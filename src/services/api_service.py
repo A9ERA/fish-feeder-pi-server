@@ -30,7 +30,7 @@ class APIService:
         self.control_service = ControlService(serial_service)  # Initialize control service
         self.firebase_service = FirebaseService()  # Initialize Firebase service
         self.sensor_data_service = SensorDataService()  # Initialize sensor data service
-        self.feeder_service = FeederService(self.control_service)  # Initialize feeder service
+        self.feeder_service = FeederService(self.control_service, self.video_service)  # Initialize feeder service with video service
         self.scheduler_service = SchedulerService(self.firebase_service, self)  # Initialize scheduler service
         self.chart_data_service = ChartDataService()  # Initialize chart data service
         self.feeder_history_service = FeederHistoryService()  # Initialize feeder history service

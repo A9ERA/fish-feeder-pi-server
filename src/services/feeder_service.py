@@ -19,7 +19,11 @@ class FeederService:
         """
         self.control_service = control_service
         self.history_service = FeederHistoryService()
-        self.video_service = video_service or VideoStreamService()
+        # Only create VideoStreamService if not provided (avoid multiple camera instances)
+        if video_service is not None:
+            self.video_service = video_service
+        else:
+            self.video_service = VideoStreamService()
         self._lock = threading.Lock()
         self.is_running = False
 
