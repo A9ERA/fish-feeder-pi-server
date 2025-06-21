@@ -252,22 +252,34 @@ class ControlService:
                 
                 # Parse the status information
                 status_info = {}
+                arduino_status = None
+                arduino_interval = None
+                
                 for line in response_lines:
                     print(f"[Control Service] Arduino response: {line}")
                     
                     if 'Sensor service status:' in line:
                         if 'ACTIVE' in line:
-                            status_info['status'] = 'ACTIVE'
-                            status_info['is_running'] = True
+                            arduino_status = 'ACTIVE'
                         else:
-                            status_info['status'] = 'INACTIVE'
-                            status_info['is_running'] = False
+                            arduino_status = 'INACTIVE'
                     elif 'Print interval:' in line:
                         # Extract interval value (e.g., "Print interval: 1000ms")
                         import re
                         match = re.search(r'(\d+)ms', line)
                         if match:
-                            status_info['interval'] = int(match.group(1))
+                            arduino_interval = int(match.group(1))
+                
+                # Set consistent status values
+                if arduino_status:
+                    status_info['status'] = arduino_status
+                    status_info['is_running'] = (arduino_status == 'ACTIVE')
+                else:
+                    status_info['status'] = 'UNKNOWN'
+                    status_info['is_running'] = False
+                    
+                if arduino_interval:
+                    status_info['interval'] = arduino_interval
                 
                 return {
                     'success': True,
