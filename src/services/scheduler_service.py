@@ -192,7 +192,7 @@ class SchedulerService:
                 
                 # Send command to Arduino
                 if self.api_service and hasattr(self.api_service, 'serial_service'):
-                    command = "[control]:relay:fan:on" if firebase_fan_status else "[control]:relay:fan:off"
+                    command = "relay:fan:on" if firebase_fan_status else "relay:fan:off"
                     result = self.api_service.serial_service.send_command_with_response(command)
                     logger.info(f"[Scheduler] Sent fan command: {command}, Result: {result}")
                 else:
@@ -206,7 +206,7 @@ class SchedulerService:
                 
                 # Send command to Arduino
                 if self.api_service and hasattr(self.api_service, 'serial_service'):
-                    command = "[control]:relay:led:on" if firebase_led_status else "[control]:relay:led:off"
+                    command = "relay:led:on" if firebase_led_status else "relay:led:off"
                     result = self.api_service.serial_service.send_command_with_response(command)
                     logger.info(f"[Scheduler] Sent LED command: {command}, Result: {result}")
                 else:
@@ -255,7 +255,7 @@ class SchedulerService:
                                         
                                         # Send command to Arduino
                                         if self.api_service and hasattr(self.api_service, 'serial_service'):
-                                            command = "[control]:relay:fan:on" if should_fan_be_on else "[control]:relay:fan:off"
+                                            command = "relay:fan:on" if should_fan_be_on else "relay:fan:off"
                                             result = self.api_service.serial_service.send_command_with_response(command)
                                             logger.info(f"[Scheduler] Auto temp control sent command: {command}, Result: {result}")
                                         else:
