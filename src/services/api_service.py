@@ -62,6 +62,7 @@ class APIService:
         
         # Feeder control routes
         self.app.route('/api/feeder/start', methods=['POST'])(self.start_feeder)
+        self.app.route('/api/feeder/stop', methods=['POST'])(self.stop_feeder)
         
         # Schedule sync routes
         self.app.route('/api/schedule/sync', methods=['POST'])(self.sync_schedule_data)
@@ -555,6 +556,24 @@ class APIService:
             return jsonify({
                 'status': 'error',
                 'message': f'Error starting feeder process: {str(e)}'
+            }), 500
+
+    def stop_feeder(self):
+        """Stop feeder process via API (Emergency Stop)"""
+        try:
+            # Emergency stop doesn't require any parameters
+            # Send stop command to Arduino immediately
+            result = self.feeder_service.stop_all()
+
+            if result['status'] == 'success':
+                return jsonify(result)
+            else:
+                return jsonify(result), 500
+
+        except Exception as e:
+            return jsonify({
+                'status': 'error',
+                'message': f'Error stopping feeder process: {str(e)}'
             }), 500
 
     def sync_schedule_data(self):

@@ -71,77 +71,23 @@ class FeederService:
             except Exception as video_error:
                 print(f"[Feeder Service] Warning: Failed to start video recording: {video_error}")
 
-            # Step 1: Actuator motor up
-            print(f"[Feeder Service] Step 1: Moving actuator up for {actuator_up} seconds")
-            if not self.control_service.control_actuator_motor('up'):
-                raise Exception("Failed to start actuator up")
+            # Send feeder start command to Arduino with parameters
+            feeder_params = f"{actuator_up},{actuator_down},{auger_duration},{blower_duration}"
+            command = f"feeder:start:{feeder_params}"
             
-            time.sleep(actuator_up)
+            print(f"[Feeder Service] Sending command to Arduino: [control]:{command}")
+            if not self.control_service._send_command(command):
+                raise Exception("Failed to send feeder start command to Arduino")
             
-            if not self.control_service.control_actuator_motor('stop'):
-                raise Exception("Failed to stop actuator after up movement")
-            print(f"[Feeder Service] Step 1 completed: Actuator up movement finished")
-
-            time.sleep(1)
+            # Calculate total estimated duration (with some buffer)
+            total_duration = actuator_up + actuator_down + max(auger_duration, blower_duration)
+            buffer_time = 5  # Extra 5 seconds buffer
+            estimated_duration = total_duration + buffer_time
             
-            # Step 2: Actuator motor down
-            print(f"[Feeder Service] Step 2: Moving actuator down for {actuator_down} seconds")
-            if not self.control_service.control_actuator_motor('down'):
-                raise Exception("Failed to start actuator down")
+            print(f"[Feeder Service] Feeding process initiated on Arduino. Estimated duration: {estimated_duration}s")
             
-            time.sleep(actuator_down)
-            
-            if not self.control_service.control_actuator_motor('stop'):
-                raise Exception("Failed to stop actuator after down movement")
-            print(f"[Feeder Service] Step 2 completed: Actuator down movement finished")
-
-            # Step 3 & 4: Start auger and blower simultaneously
-            print(f"[Feeder Service] Step 3 & 4: Starting auger (forward) and blower simultaneously")
-            print(f"Auger duration: {auger_duration}s, Blower duration: {blower_duration}s")
-            
-            # Start both devices
-            if not self.control_service.control_auger('forward'):
-                raise Exception("Failed to start auger forward")
-            
-            if not self.control_service.control_blower('start'):
-                raise Exception("Failed to start blower")
-            
-            # Create functions to stop each device after their respective durations
-            auger_stopped = threading.Event()
-            blower_stopped = threading.Event()
-            
-            def stop_auger():
-                time.sleep(auger_duration)
-                if not self.control_service.control_auger('stop'):
-                    print(f"[Feeder Service] Warning: Failed to stop auger")
-                else:
-                    print(f"[Feeder Service] Auger operation finished after {auger_duration}s")
-                auger_stopped.set()
-            
-            def stop_blower():
-                time.sleep(blower_duration)
-                if not self.control_service.control_blower('stop'):
-                    print(f"[Feeder Service] Warning: Failed to stop blower")
-                else:
-                    print(f"[Feeder Service] Blower operation finished after {blower_duration}s")
-                blower_stopped.set()
-            
-            # Start timer threads for stopping each device
-            auger_thread = threading.Thread(target=stop_auger)
-            blower_thread = threading.Thread(target=stop_blower)
-            
-            auger_thread.start()
-            blower_thread.start()
-            
-            # Wait for both operations to complete
-            auger_stopped.wait()
-            blower_stopped.wait()
-            
-            # Wait for threads to finish
-            auger_thread.join()
-            blower_thread.join()
-            
-            print(f"[Feeder Service] Step 3 & 4 completed: Both auger and blower operations finished")
+            # Wait for the estimated duration
+            time.sleep(estimated_duration)
 
             # Stop video recording
             try:
@@ -163,20 +109,21 @@ class FeederService:
                 auger_duration=auger_duration,
                 blower_duration=blower_duration,
                 status='success',
-                message='Feeding process completed successfully',
+                message='Feeding process completed successfully (Arduino controlled)',
                 video_file=video_filename
             )
             
             return {
                 'status': 'success',
-                'message': 'Feeding process completed successfully',
+                'message': 'Feeding process completed successfully (Arduino controlled)',
                 'feed_size': feed_size,
                 'video_file': video_file,
-                'total_duration': actuator_up + actuator_down + auger_duration + blower_duration,
+                'total_duration': estimated_duration,
                 'steps_completed': [
-                    f"Actuator up: {actuator_up}s",
-                    f"Actuator down: {actuator_down}s", 
-                    f"Auger forward & Blower (simultaneous): {auger_duration}s & {blower_duration}s"
+                    f"Arduino controlled sequence:",
+                    f"  - Actuator up: {actuator_up}s",
+                    f"  - Actuator down: {actuator_down}s", 
+                    f"  - Auger forward & Blower (simultaneous): {auger_duration}s & {blower_duration}s"
                 ]
             }
 
@@ -192,6 +139,13 @@ class FeederService:
             except Exception as video_error:
                 print(f"[Feeder Service] Warning: Failed to stop video recording on error: {video_error}")
             
+            # Send emergency stop command to Arduino
+            try:
+                print(f"[Feeder Service] Sending emergency stop command to Arduino")
+                self.control_service._send_command("feeder:stop")
+            except:
+                print(f"[Feeder Service] Failed to send emergency stop command to Arduino")
+            
             # Log failed feed operation
             # Extract only filename from full path for CSV storage
             video_filename = Path(video_file).name if video_file else ""
@@ -205,15 +159,6 @@ class FeederService:
                 message=error_msg,
                 video_file=video_filename
             )
-            
-            # Try to stop all devices in case of error
-            try:
-                self.control_service.control_actuator_motor('stop')
-                self.control_service.control_auger('stop')
-                self.control_service.control_blower('stop')
-                print(f"[Feeder Service] Emergency stop commands sent to all devices")
-            except:
-                print(f"[Feeder Service] Failed to send emergency stop commands")
 
             return {
                 'status': 'error',
@@ -240,22 +185,20 @@ class FeederService:
         try:
             print(f"[Feeder Service] Emergency stop initiated")
             
-            # Stop all devices
-            self.control_service.control_actuator_motor('stop')
-            self.control_service.control_auger('stop') 
-            self.control_service.control_blower('stop')
+            # Send emergency stop command to Arduino
+            self.control_service._send_command("feeder:stop")
             
             self.is_running = False
             
             return {
                 'status': 'success',
-                'message': 'All feeder devices stopped successfully'
+                'message': 'Emergency stop command sent to Arduino'
             }
             
         except Exception as e:
             return {
                 'status': 'error',
-                'message': f'Failed to stop devices: {str(e)}'
+                'message': f'Failed to send stop command: {str(e)}'
             }
 
     def get_status(self) -> dict:

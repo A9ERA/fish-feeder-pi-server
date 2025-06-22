@@ -232,6 +232,50 @@ This endpoint starts an automated feeding process that executes a sequence of op
 3. Run auger forward for specified duration, then stop
 4. Run blower for specified duration, then stop
 
+**Endpoint:** `POST /api/feeder/stop`
+
+**Description:** 
+This endpoint immediately stops any running feeding process (Emergency Stop). It sends a `[control]:feeder:stop` command to the Arduino to interrupt the current feeding sequence.
+
+**Request Body:**
+```json
+{
+  // No parameters required for emergency stop
+}
+```
+
+**Examples:**
+```bash
+# Emergency stop feeding process
+curl -X POST http://localhost:5000/api/feeder/stop \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
+
+**Success Response:**
+```json
+{
+  "status": "success",
+  "message": "Emergency stop command sent to Arduino"
+}
+```
+
+**Error Response:**
+```json
+{
+  "status": "error",
+  "message": "Failed to send stop command: connection error"
+}
+```
+
+**Arduino Integration:**
+- Sends command: `[control]:feeder:stop`
+- Arduino should immediately stop all feeding operations
+- Interrupts any running feeding sequence
+- Safe to call even when no feeding is in progress
+
+**Start Feeder Endpoint:**
+
 **Request Body:**
 ```json
 {
