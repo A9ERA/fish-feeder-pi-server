@@ -210,9 +210,17 @@ class SerialService:
             self.serial.write(full_command.encode('utf-8'))
             print(f"[Serial Service] Sent command: {full_command.strip()}")
             return True
-        except serial.SerialException as e:
-            print(f"❌ Serial error sending command: {e}")
+        except (serial.SerialException, OSError, IOError) as e:
+            print(f"❌ Serial connection error sending command: {e}")
             print("🔄 Attempting to reconnect and retry...")
+            
+            # Close and reset connection
+            try:
+                if self.serial and self.serial.is_open:
+                    self.serial.close()
+            except:
+                pass
+            self.serial = None
             
             # Try to reconnect and retry once
             if self._attempt_reconnection():
@@ -228,7 +236,8 @@ class SerialService:
                 print("❌ Failed to reconnect")
                 return False
         except Exception as e:
-            print(f"❌ Error sending command: {e}")
+            print(f"❌ Unexpected error sending command: {e}")
+            print(f"   Error type: {type(e).__name__}")
             return False
 
     def send_command_with_response(self, command: str, timeout: float = 3.0) -> Dict:
@@ -299,9 +308,17 @@ class SerialService:
                 'error': 'Command timeout - no response received'
             }
             
-        except serial.SerialException as e:
-            print(f"❌ Serial error sending command with response: {e}")
+        except (serial.SerialException, OSError, IOError) as e:
+            print(f"❌ Serial connection error sending command with response: {e}")
             print("🔄 Attempting to reconnect...")
+            
+            # Close and reset connection
+            try:
+                if self.serial and self.serial.is_open:
+                    self.serial.close()
+            except:
+                pass
+            self.serial = None
             
             # Clean up pending command
             with self._command_lock:
@@ -315,7 +332,7 @@ class SerialService:
             else:
                 return {
                     'success': False,
-                    'error': f'Serial error: {str(e)} and reconnection failed'
+                    'error': f'Serial connection error: {str(e)} and reconnection failed'
                 }
         except Exception as e:
             print(f"❌ Error sending command with response: {e}")
@@ -388,11 +405,11 @@ class SerialService:
                             self._process_data(line)
                     # Reset reconnection attempts on successful read
                     reconnection_attempts = 0
-                except serial.SerialException as e:
-                    print(f"❌ Serial read error: {e}")
-                    print("💡 Arduino may have been disconnected")
+                except (serial.SerialException, OSError, IOError) as e:
+                    print(f"❌ Serial connection error: {e}")
+                    print("💡 Arduino may have been disconnected or connection lost")
                     
-                    # Handle Input/output error and other serial exceptions
+                    # Handle Input/output error and other connection errors
                     print(f"🔄 Attempting to reconnect... (attempt {reconnection_attempts + 1}/{max_reconnection_attempts})")
                     
                     # Close current connection
@@ -423,9 +440,10 @@ class SerialService:
                             time.sleep(reconnection_delay)
                             
                 except Exception as e:
-                    print(f"❌ Error reading serial data: {e}")
-                    # For non-serial exceptions, continue trying
-                    time.sleep(0.1)
+                    print(f"❌ Unexpected error reading serial data: {e}")
+                    print(f"   Error type: {type(e).__name__}")
+                    # For truly unexpected exceptions, add a small delay to prevent spam
+                    time.sleep(0.5)
                     continue
             else:
                 # No connection available, try to establish one
