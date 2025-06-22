@@ -318,6 +318,7 @@ class SchedulerService:
         """
         try:
             logger.info("[Scheduler] Running feed schedule job...")
+            print("[Scheduler] Running feed schedule job...")
             
             # Clean up old executed schedules (keep only today's records)
             self._cleanup_executed_schedules()
