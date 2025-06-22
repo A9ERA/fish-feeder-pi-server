@@ -364,4 +364,32 @@ class ControlService:
         Legacy method name for actuator control
         Redirects to control_actuator for backward compatibility
         """
-        return self.control_actuator(action) 
+        return self.control_actuator(action)
+
+    # Weight sensor calibration methods
+    def weight_calibrate(self) -> bool:
+        """Start weight sensor calibration"""
+        return self._send_command("weight:calibrate")
+
+    def control_weight(self, action: str) -> dict:
+        """
+        Control weight sensor with a single method
+        
+        Args:
+            action: Action to perform ('calibrate')
+            
+        Returns:
+            dict: Result with success status and any response data
+        """
+        if action == "calibrate":
+            success = self.weight_calibrate()
+            return {
+                'success': success,
+                'command_success': success,
+                'message': 'Weight calibration started' if success else 'Failed to start weight calibration'
+            }
+        else:
+            return {
+                'success': False,
+                'error': f'Unknown weight action: {action}. Valid action: calibrate'
+            } 

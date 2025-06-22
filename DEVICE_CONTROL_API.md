@@ -1,7 +1,7 @@
 # Device Control API Documentation
 
 ## Overview
-This API provides endpoints to control various devices connected to the Arduino via serial communication.
+This API provides endpoints to control various devices connected to the Arduino via serial communication, including blower, actuator, auger, relay, weight sensor, and feeding operations.
 
 ## Arduino Commands Supported
 The following commands are supported by the Arduino:
@@ -25,6 +25,7 @@ The following commands are supported by the Arduino:
 [control]:relay:fan:on
 [control]:relay:fan:off
 [control]:relay:all:off
+[control]:weight:calibrate
 ```
 
 ## API Endpoints
@@ -171,7 +172,57 @@ curl -X POST http://localhost:5000/api/control/relay \
   -d '{"device": "all", "action": "off"}'
 ```
 
-### 5. Feeder Control
+### 5. Weight Calibration
+**Endpoint:** `POST /api/control/weight`
+
+**Description:** 
+This endpoint initiates the weight sensor calibration process. The calibration helps ensure accurate weight measurements by adjusting the sensor's internal parameters.
+
+**Request Body:**
+```json
+{
+  "action": "calibrate"
+}
+```
+
+**Examples:**
+```bash
+# Start weight calibration
+curl -X POST http://localhost:5000/api/control/weight \
+  -H "Content-Type: application/json" \
+  -d '{"action": "calibrate"}'
+```
+
+**Success Response:**
+```json
+{
+  "status": "success",
+  "message": "Weight calibration started",
+  "action": "calibrate",
+  "timestamp": "2024-01-01 12:00:00"
+}
+```
+
+**Error Response:**
+```json
+{
+  "status": "error",
+  "message": "Failed to start weight calibration",
+  "action": "calibrate",
+  "timestamp": "2024-01-01 12:00:00"
+}
+```
+
+**Parameter Validation:**
+- Only `"action": "calibrate"` is supported
+- Request must be in JSON format
+
+**Arduino Integration:**
+- Sends command: `[control]:weight:calibrate`
+- Arduino should respond with calibration status messages
+- Calibration process may take time to complete
+
+### 6. Feeder Control
 **Endpoint:** `POST /api/feeder/start`
 
 **Description:** 
@@ -284,7 +335,7 @@ curl -X POST http://localhost:5000/api/feeder/start \
 - Comprehensive error handling and logging
 - Device status checking before each operation
 
-### 6. Schedule Sync (New)
+### 7. Schedule Sync (New)
 **Endpoint:** `POST /api/schedule/sync`
 
 **Description:** 
@@ -339,7 +390,7 @@ curl -X POST http://localhost:5000/api/schedule/sync \
 - Handles cases when no data exists in Firebase
 - Comprehensive error handling for network/Firebase issues
 
-### 7. Feed Preset Sync (New)
+### 8. Feed Preset Sync (New)
 **Endpoint:** `POST /api/feed-preset/sync`
 
 **Description:** 
@@ -470,6 +521,10 @@ curl -X POST http://localhost:5000/api/control/auger \
   -H "Content-Type: application/json" \
   -d '{"action": "forward"}'
 
+curl -X POST http://localhost:5000/api/control/weight \
+  -H "Content-Type: application/json" \
+  -d '{"action": "calibrate"}'
+
 # Test complete feeding process
 curl -X POST http://localhost:5000/api/feeder/start \
   -H "Content-Type: application/json" \
@@ -504,6 +559,7 @@ You can also control the devices using the web interface at `http://localhost:50
 - Camera controls (existing functionality)
 - Blower controls with start/stop, speed setting, and direction control
 - Actuator motor controls with up/down/stop actions
+- Weight sensor calibration controls
 
 ## Error Handling
 

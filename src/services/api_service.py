@@ -57,6 +57,7 @@ class APIService:
         self.app.route('/api/control/auger', methods=['POST'])(self.control_auger)
         self.app.route('/api/control/relay', methods=['POST'])(self.control_relay)
         self.app.route('/api/control/sensor', methods=['POST'])(self.control_sensor)
+        self.app.route('/api/control/weight', methods=['POST'])(self.control_weight)
         
         # Feeder control routes
         self.app.route('/api/feeder/start', methods=['POST'])(self.start_feeder)
@@ -1000,6 +1001,59 @@ class APIService:
             return jsonify({
                 'status': 'error',
                 'message': f'Error controlling sensor: {str(e)}'
+            }), 500
+
+    def control_weight(self):
+        """Control weight sensor operations"""
+        try:
+            if not request.is_json:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Request must be JSON'
+                }), 400
+
+            data = request.get_json()
+            action = data.get('action')
+            
+            if not action:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Action is required'
+                }), 400
+
+            # Validate action
+            if action != 'calibrate':
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Invalid action. Must be: calibrate'
+                }), 400
+
+            # Execute the action
+            result = self.control_service.control_weight(action)
+            
+            if result.get('success'):
+                response_data = {
+                    'status': 'success',
+                    'message': result.get('message', f'Weight {action} command executed successfully'),
+                    'action': action,
+                    'timestamp': time.strftime('%Y-%m-%d %H:%M:%S')
+                }
+                
+
+                
+                return jsonify(response_data)
+            else:
+                return jsonify({
+                    'status': 'error',
+                    'message': result.get('error', f'Failed to execute weight {action} command'),
+                    'action': action,
+                    'timestamp': time.strftime('%Y-%m-%d %H:%M:%S')
+                }), 500
+
+        except Exception as e:
+            return jsonify({
+                'status': 'error',
+                'message': f'Error controlling weight sensor: {str(e)}'
             }), 500
 
     def start(self):
