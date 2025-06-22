@@ -1059,9 +1059,22 @@ class APIService:
     def start(self):
         """Start the Flask server"""
         try:
+            # Start scheduler service automatically
+            print("🔄 Starting scheduler service...")
+            self.scheduler_service.start()
+            print("✅ Scheduler service started successfully")
+            
             # Start Flask server
             self.app.run(host=self.host, port=self.port)
         finally:
+            # Stop scheduler service
+            try:
+                print("⏰ Stopping scheduler service...")
+                self.scheduler_service.stop()
+                print("✅ Scheduler service stopped")
+            except Exception as e:
+                print(f"⚠️ Error stopping scheduler service: {e}")
+                
             # Release video service resources
             if hasattr(self, 'video_service'):
                 self.video_service.release() 
