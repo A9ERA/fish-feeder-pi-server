@@ -43,6 +43,10 @@ class SchedulerService:
         
         # Settings file path for offline fallback
         self.settings_file = Path(__file__).parent.parent / 'data' / 'app_settings.jsonc'
+        
+        # Global variables for system status monitoring
+        self.current_fan_is_on = False
+        self.current_led_is_on = False
 
     def _get_app_settings(self) -> Dict[str, Any]:
         """
@@ -168,6 +172,105 @@ class SchedulerService:
             self.sensor_history_service.save_current_sensor_data()
         except Exception as e:
             logger.error(f"[Scheduler] Error in sensor history job: {str(e)}")
+
+    def _system_status_monitor_job(self):
+        """Job function for monitoring system status from Firebase and controlling Arduino"""
+        try:
+            # Get system status from Firebase
+            ref = db.reference('/system_status')
+            system_status = ref.get()
+            
+            if not system_status:
+                logger.warning("[Scheduler] No system status data found in Firebase")
+                return
+            
+            # 1. Monitor fan status
+            firebase_fan_status = system_status.get('is_fan_on', False)
+            if firebase_fan_status != self.current_fan_is_on:
+                logger.info(f"[Scheduler] Fan status changed: {self.current_fan_is_on} -> {firebase_fan_status}")
+                self.current_fan_is_on = firebase_fan_status
+                
+                # Send command to Arduino
+                if self.api_service and hasattr(self.api_service, 'serial_service'):
+                    command = "[control]:relay:fan:on" if firebase_fan_status else "[control]:relay:fan:off"
+                    result = self.api_service.serial_service.send_command_with_response(command)
+                    logger.info(f"[Scheduler] Sent fan command: {command}, Result: {result}")
+                else:
+                    logger.warning("[Scheduler] Serial service not available for fan control")
+            
+            # 2. Monitor LED status
+            firebase_led_status = system_status.get('led_status', False)
+            if firebase_led_status != self.current_led_is_on:
+                logger.info(f"[Scheduler] LED status changed: {self.current_led_is_on} -> {firebase_led_status}")
+                self.current_led_is_on = firebase_led_status
+                
+                # Send command to Arduino
+                if self.api_service and hasattr(self.api_service, 'serial_service'):
+                    command = "[control]:relay:led:on" if firebase_led_status else "[control]:relay:led:off"
+                    result = self.api_service.serial_service.send_command_with_response(command)
+                    logger.info(f"[Scheduler] Sent LED command: {command}, Result: {result}")
+                else:
+                    logger.warning("[Scheduler] Serial service not available for LED control")
+            
+            # 3. Monitor auto temperature control
+            is_auto_temp_control = system_status.get('is_auto_temp_control', False)
+            if is_auto_temp_control:
+                fan_activation_threshold = system_status.get('fan_activation_threshold', 30)
+                
+                # Read current system temperature from sensors_data.jsonc
+                sensors_file = Path(__file__).parent.parent / 'data' / 'sensors_data.jsonc'
+                if sensors_file.exists():
+                    try:
+                        with open(sensors_file, 'r', encoding='utf-8') as f:
+                            file_content = f.read().strip()
+                            if file_content:
+                                sensors_data = json5.loads(file_content)
+                                
+                                # Get DHT22_SYSTEM temperature
+                                dht22_system = sensors_data.get('sensors', {}).get('DHT22_SYSTEM', {})
+                                values = dht22_system.get('values', [])
+                                
+                                current_system_temp = None
+                                for value in values:
+                                    if value.get('type') == 'temperature':
+                                        current_system_temp = float(value.get('value', 0))
+                                        break
+                                
+                                if current_system_temp is not None:
+                                    logger.debug(f"[Scheduler] Auto temp control: Current={current_system_temp}°C, Threshold={fan_activation_threshold}°C")
+                                    
+                                    # Determine if fan should be on based on temperature
+                                    should_fan_be_on = current_system_temp >= fan_activation_threshold
+                                    
+                                    # Update Firebase and global variable if needed
+                                    if should_fan_be_on != self.current_fan_is_on:
+                                        logger.info(f"[Scheduler] Auto temp control: Fan should be {'ON' if should_fan_be_on else 'OFF'} (temp: {current_system_temp}°C)")
+                                        
+                                        # Update Firebase
+                                        fan_ref = db.reference('/system_status/is_fan_on')
+                                        fan_ref.set(should_fan_be_on)
+                                        
+                                        # Update global variable
+                                        self.current_fan_is_on = should_fan_be_on
+                                        
+                                        # Send command to Arduino
+                                        if self.api_service and hasattr(self.api_service, 'serial_service'):
+                                            command = "[control]:relay:fan:on" if should_fan_be_on else "[control]:relay:fan:off"
+                                            result = self.api_service.serial_service.send_command_with_response(command)
+                                            logger.info(f"[Scheduler] Auto temp control sent command: {command}, Result: {result}")
+                                        else:
+                                            logger.warning("[Scheduler] Serial service not available for auto temp control")
+                                else:
+                                    logger.warning("[Scheduler] Could not find temperature value in DHT22_SYSTEM sensor data")
+                            else:
+                                logger.warning("[Scheduler] Sensors data file is empty")
+                    except Exception as e:
+                        logger.error(f"[Scheduler] Error reading sensors data file: {str(e)}")
+                else:
+                    logger.warning("[Scheduler] Sensors data file not found")
+            
+        except Exception as e:
+            logger.error(f"[Scheduler] Error in system status monitor job: {str(e)}")
 
     def _run_sensor_history_job_with_timing(self):
         """Run sensor history job only on seconds divisible by 5"""
@@ -380,7 +483,8 @@ class SchedulerService:
             ('syncSensors', self._sync_sensors_job, self._current_settings['syncSensors']),
             ('syncSchedule', self._sync_schedule_job, self._current_settings['syncSchedule']),
             ('syncFeedPreset', self._sync_feed_preset_job, self._current_settings['syncFeedPreset']),
-            ('runFeedSchedule', self.run_feed_schedule_job, 1)
+            ('runFeedSchedule', self.run_feed_schedule_job, 1),
+            ('systemStatusMonitor', self._system_status_monitor_job, 1)
         ]
         
         for job_name, job_func, interval in jobs:
