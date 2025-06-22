@@ -26,6 +26,7 @@ class APIService:
         self.port = port
         self.sensors_file = Path(__file__).parent.parent / 'data' / 'sensors_data.jsonc'
         self.start_time = time.time()
+        self.serial_service = serial_service  # Store serial service reference
         self.video_service = VideoStreamService()  # Initialize video service
         self.control_service = ControlService(serial_service)  # Initialize control service
         self.firebase_service = FirebaseService()  # Initialize Firebase service
