@@ -177,6 +177,12 @@ class APIService:
                 'version': '1.0.0'
             })
             
+        except ValueError as json_error:
+            return jsonify({
+                'status': 'unhealthy',
+                'error': f'JSON parsing error: {str(json_error)}',
+                'timestamp': time.strftime('%Y-%m-%d %H:%M:%S')
+            }), 503
         except Exception as e:
             return jsonify({
                 'status': 'unhealthy',

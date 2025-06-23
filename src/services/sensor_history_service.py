@@ -46,6 +46,9 @@ class SensorHistoryService:
                     return {}
                     
                 return json5.loads(content)
+        except ValueError as json_error:
+            print(f"[❌][Sensor History] JSON parsing error reading sensor data: {json_error}")
+            return {}
         except Exception as e:
             print(f"[❌][Sensor History] Error reading sensor data: {e}")
             return {}

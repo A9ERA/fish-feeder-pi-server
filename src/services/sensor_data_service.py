@@ -84,7 +84,7 @@ class SensorDataService:
                             sensors_data = json5.loads(file_content)
                     else:
                         sensors_data = json5.loads(file_content)
-            except (json5.JSONError, ValueError) as json_error:
+            except ValueError as json_error:
                 # Handle JSON parsing errors
                 print(f"[❌][Sensor Data Service] JSON parsing error: {json_error}, recreating file...")
                 # Force recreate the file by removing corrupted one
@@ -155,7 +155,7 @@ class SensorDataService:
                             }
                     
                     return json5.loads(file_content)
-            except (json5.JSONError, ValueError) as json_error:
+            except ValueError as json_error:
                 # Handle JSON parsing errors
                 print(f"[❌][Sensor Data Service] JSON parsing error in get_sensor_data: {json_error}, recreating file...")
                 # Force recreate the file by removing corrupted one

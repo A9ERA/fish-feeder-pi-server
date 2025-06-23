@@ -264,6 +264,8 @@ class SchedulerService:
                                     logger.warning("[Scheduler] Could not find temperature value in DHT22_SYSTEM sensor data")
                             else:
                                 logger.warning("[Scheduler] Sensors data file is empty")
+                    except ValueError as json_error:
+                        logger.error(f"[Scheduler] JSON parsing error reading sensors data: {str(json_error)}")
                     except Exception as e:
                         logger.error(f"[Scheduler] Error reading sensors data file: {str(e)}")
                 else:
@@ -335,20 +337,28 @@ class SchedulerService:
                 return
             
             # Read schedule data
-            with open(schedule_file, 'r', encoding='utf-8') as f:
-                file_content = f.read().strip()
-                if not file_content:
-                    logger.warning("[Scheduler] Schedule data file is empty, skipping feed schedule job")
-                    return
-                schedule_data = json5.loads(file_content)
+            try:
+                with open(schedule_file, 'r', encoding='utf-8') as f:
+                    file_content = f.read().strip()
+                    if not file_content:
+                        logger.warning("[Scheduler] Schedule data file is empty, skipping feed schedule job")
+                        return
+                    schedule_data = json5.loads(file_content)
+            except ValueError as json_error:
+                logger.error(f"[Scheduler] JSON parsing error reading schedule data: {str(json_error)}")
+                return
             
             # Read feed preset data
-            with open(feed_preset_file, 'r', encoding='utf-8') as f:
-                file_content = f.read().strip()
-                if not file_content:
-                    logger.warning("[Scheduler] Feed preset data file is empty, skipping feed schedule job")
-                    return
-                feed_preset_data = json5.loads(file_content)
+            try:
+                with open(feed_preset_file, 'r', encoding='utf-8') as f:
+                    file_content = f.read().strip()
+                    if not file_content:
+                        logger.warning("[Scheduler] Feed preset data file is empty, skipping feed schedule job")
+                        return
+                    feed_preset_data = json5.loads(file_content)
+            except ValueError as json_error:
+                logger.error(f"[Scheduler] JSON parsing error reading feed preset data: {str(json_error)}")
+                return
             
             if 'schedule_data' not in schedule_data or not isinstance(schedule_data['schedule_data'], list):
                 logger.warning("[Scheduler] Invalid schedule data format, skipping feed schedule job")
