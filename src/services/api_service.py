@@ -485,31 +485,25 @@ class APIService:
 
             data = request.get_json()
             
-            # Extract parameters from request
+            # Extract parameters from request (actuator timings are now fixed in Arduino)
             feed_size = data.get('feedSize')
-            actuator_up = data.get('actuatorUp')
-            actuator_down = data.get('actuatorDown')
             auger_duration = data.get('augerDuration')
             blower_duration = data.get('blowerDuration')
 
             # Validate required parameters
             if not all([
                 feed_size is not None,
-                actuator_up is not None,
-                actuator_down is not None,
                 auger_duration is not None,
                 blower_duration is not None
             ]):
                 return jsonify({
                     'status': 'error',
-                    'message': 'All parameters are required: feedSize, actuatorUp, actuatorDown, augerDuration, blowerDuration'
+                    'message': 'All parameters are required: feedSize, augerDuration, blowerDuration (actuator timings are fixed at 5s up, 10s down)'
                 }), 400
 
             # Validate parameter types and values
             try:
                 feed_size = int(feed_size)
-                actuator_up = int(actuator_up)
-                actuator_down = int(actuator_down)
                 auger_duration = int(auger_duration)
                 blower_duration = int(blower_duration)
             except (ValueError, TypeError):
@@ -521,8 +515,6 @@ class APIService:
             # Validate parameter ranges
             if any([
                 feed_size < 0,
-                actuator_up < 0,
-                actuator_down < 0,
                 auger_duration < 0,
                 blower_duration < 0
             ]):
@@ -534,8 +526,6 @@ class APIService:
             # Validate reasonable maximum values (safety limits)
             max_duration = 300  # 5 minutes max for any single operation
             if any([
-                actuator_up > max_duration,
-                actuator_down > max_duration,
                 auger_duration > max_duration,
                 blower_duration > max_duration
             ]):
@@ -544,11 +534,9 @@ class APIService:
                     'message': f'Duration parameters cannot exceed {max_duration} seconds for safety'
                 }), 400
 
-            # Start the feeder process
+            # Start the feeder process (actuator timings are fixed in Arduino: 5s up, 10s down)
             result = self.feeder_service.start(
                 feed_size=feed_size,
-                actuator_up=actuator_up,
-                actuator_down=actuator_down,
                 auger_duration=auger_duration,
                 blower_duration=blower_duration
             )
