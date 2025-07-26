@@ -26,10 +26,10 @@ def display_menu():
     print("  4. Set blower direction to reverse")
     print("  5. Set blower direction to normal")
     print()
-    print("ACTUATOR MOTOR CONTROLS:")
-    print("  6. Move actuator up")
-    print("  7. Move actuator down")
-    print("  8. Stop actuator motor")
+    print("SOLENOID VALVE CONTROLS:")
+    print("  6. Open solenoid valve")
+    print("  7. Close solenoid valve")
+    print("  8. Stop solenoid valve")
     print()
     print("TESTING:")
     print("  9. Run full automatic test")
@@ -67,10 +67,10 @@ def run_automatic_test(ser):
         "[control]:blower:direction:reverse\n",
         "[control]:blower:direction:normal\n",
         "[control]:blower:stop\n",
-        "[control]:actuatormotor:up\n",
-        "[control]:actuatormotor:stop\n",
-        "[control]:actuatormotor:down\n",
-        "[control]:actuatormotor:stop\n"
+        "[control]:solenoid:open\n",
+        "[control]:solenoid:stop\n",
+        "[control]:solenoid:close\n",
+        "[control]:solenoid:stop\n",
     ]
     
     for i, cmd in enumerate(commands, 1):
@@ -148,13 +148,13 @@ def main():
                     send_command(ser, "[control]:blower:direction:normal\n")
                     
                 elif choice == "6":
-                    send_command(ser, "[control]:actuatormotor:up\n")
+                    send_command(ser, "[control]:solenoid:open\n")
                     
                 elif choice == "7":
-                    send_command(ser, "[control]:actuatormotor:down\n")
+                    send_command(ser, "[control]:solenoid:close\n")
                     
                 elif choice == "8":
-                    send_command(ser, "[control]:actuatormotor:stop\n")
+                    send_command(ser, "[control]:solenoid:stop\n")
                     
                 elif choice == "9":
                     run_automatic_test(ser)

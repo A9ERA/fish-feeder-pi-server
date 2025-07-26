@@ -58,47 +58,18 @@ class ControlService:
         """Set blower direction to normal"""
         return self._send_command("blower:direction:normal")
 
-    # Actuator control methods (updated to match Arduino commands)
-    def actuator_up(self) -> bool:
-        """Move actuator up"""
-        return self._send_command("actuator:up")
+    # Solenoid valve control methods (updated to match Arduino commands)
+    def solenoid_open(self) -> bool:
+        """Open solenoid valve"""
+        return self._send_command("solenoid:open")
 
-    def actuator_down(self) -> bool:
-        """Move actuator down"""
-        return self._send_command("actuator:down")
+    def solenoid_close(self) -> bool:
+        """Close solenoid valve"""
+        return self._send_command("solenoid:close")
 
-    def actuator_stop(self) -> bool:
-        """Stop actuator"""
-        return self._send_command("actuator:stop")
-
-    # Auger control methods
-    def auger_forward(self) -> bool:
-        """Move auger forward"""
-        return self._send_command("auger:forward")
-
-    def auger_backward(self) -> bool:
-        """Move auger backward"""
-        return self._send_command("auger:backward")
-
-    def auger_stop(self) -> bool:
-        """Stop auger"""
-        return self._send_command("auger:stop")
-
-    def auger_speedtest(self) -> bool:
-        """Run auger speed test"""
-        return self._send_command("auger:speedtest")
-
-    def auger_setspeed(self, speed: int) -> bool:
-        """
-        Set auger speed
-        
-        Args:
-            speed: Speed value (0-100 or device specific range)
-        """
-        if not isinstance(speed, int) or speed < 0:
-            print("Invalid speed value. Must be a positive integer.")
-            return False
-        return self._send_command(f"auger:setspeed:{speed}")
+    def solenoid_stop(self) -> bool:
+        """Stop solenoid valve"""
+        return self._send_command("solenoid:stop")
 
     # Relay control methods
     def relay_led_on(self) -> bool:
@@ -147,46 +118,21 @@ class ControlService:
             print(f"Unknown blower action: {action}")
             return False
 
-    def control_actuator(self, action: str) -> bool:
+    def control_solenoid(self, action: str) -> bool:
         """
-        Control actuator with a single method
+        Control solenoid valve with a single method
         
         Args:
-            action: Action to perform ('up', 'down', 'stop')
+            action: Action to perform ('open', 'close', 'stop')
         """
-        if action == "up":
-            return self.actuator_up()
-        elif action == "down":
-            return self.actuator_down()
+        if action == "open":
+            return self.solenoid_open()
+        elif action == "close":
+            return self.solenoid_close()
         elif action == "stop":
-            return self.actuator_stop()
+            return self.solenoid_stop()
         else:
-            print(f"Unknown actuator action: {action}")
-            return False
-
-    def control_auger(self, action: str, value: Optional[int] = None) -> bool:
-        """
-        Control auger with a single method
-        
-        Args:
-            action: Action to perform ('forward', 'backward', 'stop', 'speedtest', 'setspeed')
-            value: Value for speed setting (required for 'setspeed' action)
-        """
-        if action == "forward":
-            return self.auger_forward()
-        elif action == "backward":
-            return self.auger_backward()
-        elif action == "stop":
-            return self.auger_stop()
-        elif action == "speedtest":
-            return self.auger_speedtest()
-        elif action == "setspeed":
-            if value is None:
-                print("Speed value is required for setspeed action")
-                return False
-            return self.auger_setspeed(value)
-        else:
-            print(f"Unknown auger action: {action}")
+            print(f"Unknown solenoid action: {action}")
             return False
 
     def control_relay(self, device: str, action: str) -> bool:
@@ -359,12 +305,7 @@ class ControlService:
             return False
 
     # Legacy method name compatibility
-    def control_actuator_motor(self, action: str) -> bool:
-        """
-        Legacy method name for actuator control
-        Redirects to control_actuator for backward compatibility
-        """
-        return self.control_actuator(action)
+
 
     # Weight sensor calibration methods
     def weight_calibrate(self) -> bool:

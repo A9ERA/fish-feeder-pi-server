@@ -28,9 +28,8 @@ class FeederHistoryService:
             row_data = {
                 'timestamp': feed_data['timestamp'],
                 'amount_g': feed_data['amount'],
-                'actuator_up_s': feed_data['actuator_up'],
-                'actuator_down_s': feed_data['actuator_down'],
-                'auger_duration_s': feed_data['auger_duration'],
+                'solenoid_open_s': feed_data['solenoid_open'],
+                'solenoid_close_s': feed_data['solenoid_close'],
                 'blower_duration_s': feed_data['blower_duration'],
                 'status': feed_data['status'],
                 'message': feed_data.get('message', ''),
@@ -68,8 +67,8 @@ class FeederHistoryService:
         except Exception as e:
             print(f"[❌][Feeder History] Error writing CSV data: {e}")
     
-    def log_feed_operation(self, feed_size: int, actuator_up: float, actuator_down: float, 
-                          auger_duration: float, blower_duration: float, status: str, message: str = "", video_file: str = ""):
+    def log_feed_operation(self, feed_size: int, solenoid_open: float, solenoid_close: float, 
+                          blower_duration: float, status: str, message: str = "", video_file: str = ""):
         """Log a feed operation to CSV file"""
         try:
             current_time = datetime.datetime.now()
@@ -88,9 +87,8 @@ class FeederHistoryService:
             feed_data = {
                 'timestamp': current_time.strftime("%Y-%m-%d %H:%M:%S"),
                 'amount': feed_size,
-                'actuator_up': actuator_up,
-                'actuator_down': actuator_down,
-                'auger_duration': auger_duration,
+                'solenoid_open': solenoid_open,
+                'solenoid_close': solenoid_close,
                 'blower_duration': blower_duration,
                 'status': status,
                 'message': message,
@@ -138,9 +136,8 @@ class FeederHistoryService:
                         feed_log = {
                             'timestamp': row['timestamp'],
                             'amount': int(float(row['amount_g'])),
-                            'actuator_up': float(row['actuator_up_s']),
-                            'actuator_down': float(row['actuator_down_s']),
-                            'auger_duration': float(row['auger_duration_s']),
+                            'solenoid_open': float(row['solenoid_open_s']),
+                            'solenoid_close': float(row['solenoid_close_s']),
                             'blower_duration': float(row['blower_duration_s']),
                             'status': row['status'],
                             'message': row.get('message', ''),

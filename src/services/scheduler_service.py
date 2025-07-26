@@ -410,14 +410,12 @@ class SchedulerService:
                     # Extract feeding parameters
                     feed_size = int(preset_data.get('amount', 0))
                     timing = preset_data.get('timing', {})
-                    auger_duration = int(timing.get('augerDuration', 0))
                     blower_duration = int(timing.get('blowerDuration', 0))
                     
                     logger.info(f"[Scheduler] Feeding parameters for schedule {schedule_id}:")
                     logger.info(f"  Feed size: {feed_size}g")
-                    logger.info(f"  Actuator up: 5s (fixed)")
-                    logger.info(f"  Actuator down: 10s (fixed)")
-                    logger.info(f"  Auger duration: {auger_duration}s")
+                    logger.info(f"  Solenoid valve open: 5s (fixed)")
+                    logger.info(f"  Solenoid valve close: 10s (fixed)")
                     logger.info(f"  Blower duration: {blower_duration}s")
                     
                     # Execute feeding process
@@ -425,7 +423,6 @@ class SchedulerService:
                         print(f"[Scheduler] Feeding schedule {schedule_id}")
                         result = self.api_service.feeder_service.start(
                             feed_size=feed_size,
-                            auger_duration=auger_duration,
                             blower_duration=blower_duration
                         )
                         

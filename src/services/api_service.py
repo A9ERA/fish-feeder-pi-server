@@ -54,8 +54,7 @@ class APIService:
         
         # Device control routes
         self.app.route('/api/control/blower', methods=['POST'])(self.control_blower)
-        self.app.route('/api/control/actuator', methods=['POST'])(self.control_actuator_motor)
-        self.app.route('/api/control/auger', methods=['POST'])(self.control_auger)
+        self.app.route('/api/control/solenoid', methods=['POST'])(self.control_solenoid)
         self.app.route('/api/control/relay', methods=['POST'])(self.control_relay)
         self.app.route('/api/control/sensor', methods=['POST'])(self.control_sensor)
         self.app.route('/api/control/weight', methods=['POST'])(self.control_weight)
@@ -303,8 +302,8 @@ class APIService:
                 'message': f'Error controlling blower: {str(e)}'
             }), 500
 
-    def control_actuator_motor(self):
-        """Control actuator motor device via API"""
+    def control_solenoid(self):
+        """Control solenoid valve device via API"""
         try:
             if not request.is_json:
                 return jsonify({
@@ -322,7 +321,7 @@ class APIService:
                 }), 400
 
             # Validate actions
-            valid_actions = ['up', 'down', 'stop']
+            valid_actions = ['open', 'close', 'stop']
             if action not in valid_actions:
                 return jsonify({
                     'status': 'error',
@@ -330,12 +329,12 @@ class APIService:
                 }), 400
 
             # Send command via control service
-            success = self.control_service.control_actuator_motor(action)
+            success = self.control_service.control_solenoid(action)
 
             if success:
                 return jsonify({
                     'status': 'success',
-                    'message': f"Actuator motor {action} command sent successfully"
+                    'message': f"Solenoid valve {action} command sent successfully"
                 })
             else:
                 return jsonify({
@@ -346,71 +345,10 @@ class APIService:
         except Exception as e:
             return jsonify({
                 'status': 'error',
-                'message': f'Error controlling actuator motor: {str(e)}'
+                'message': f'Error controlling solenoid valve: {str(e)}'
             }), 500
 
-    def control_auger(self):
-        """Control auger device via API"""
-        try:
-            if not request.is_json:
-                return jsonify({
-                    'status': 'error',
-                    'message': 'Request must be JSON'
-                }), 400
 
-            data = request.get_json()
-            action = data.get('action')
-            value = data.get('value')  # For setspeed action
-
-            if not action:
-                return jsonify({
-                    'status': 'error',
-                    'message': 'Action is required'
-                }), 400
-
-            # Validate actions
-            valid_actions = ['forward', 'backward', 'stop', 'speedtest', 'setspeed']
-            if action not in valid_actions:
-                return jsonify({
-                    'status': 'error',
-                    'message': f'Invalid action. Valid actions are: {", ".join(valid_actions)}'
-                }), 400
-
-            # For setspeed action, validate value
-            if action == 'setspeed':
-                if value is None:
-                    return jsonify({
-                        'status': 'error',
-                        'message': 'Value is required for setspeed action'
-                    }), 400
-                if not isinstance(value, int) or value < 0:
-                    return jsonify({
-                        'status': 'error',
-                        'message': 'Speed value must be a positive integer'
-                    }), 400
-
-            # Send command via control service
-            success = self.control_service.control_auger(action, value)
-
-            if success:
-                message = f"Auger {action} command sent successfully"
-                if action == 'setspeed':
-                    message = f"Auger speed set to {value}"
-                return jsonify({
-                    'status': 'success',
-                    'message': message
-                })
-            else:
-                return jsonify({
-                    'status': 'error',
-                    'message': 'Failed to send command to device'
-                }), 500
-
-        except Exception as e:
-            return jsonify({
-                'status': 'error',
-                'message': f'Error controlling auger: {str(e)}'
-            }), 500
 
     def control_relay(self):
         """Control relay device via API"""
@@ -485,26 +423,23 @@ class APIService:
 
             data = request.get_json()
             
-            # Extract parameters from request (actuator timings are now fixed in Arduino)
+            # Extract parameters from request (solenoid valve timings are now fixed in Arduino)
             feed_size = data.get('feedSize')
-            auger_duration = data.get('augerDuration')
             blower_duration = data.get('blowerDuration')
 
             # Validate required parameters
             if not all([
                 feed_size is not None,
-                auger_duration is not None,
                 blower_duration is not None
             ]):
                 return jsonify({
                     'status': 'error',
-                    'message': 'All parameters are required: feedSize, augerDuration, blowerDuration (actuator timings are fixed at 5s up, 10s down)'
+                    'message': 'All parameters are required: feedSize, blowerDuration (solenoid valve timings are fixed at 5s open, 10s close)'
                 }), 400
 
             # Validate parameter types and values
             try:
                 feed_size = int(feed_size)
-                auger_duration = int(auger_duration)
                 blower_duration = int(blower_duration)
             except (ValueError, TypeError):
                 return jsonify({
@@ -515,7 +450,6 @@ class APIService:
             # Validate parameter ranges
             if any([
                 feed_size < 0,
-                auger_duration < 0,
                 blower_duration < 0
             ]):
                 return jsonify({
@@ -525,19 +459,15 @@ class APIService:
 
             # Validate reasonable maximum values (safety limits)
             max_duration = 300  # 5 minutes max for any single operation
-            if any([
-                auger_duration > max_duration,
-                blower_duration > max_duration
-            ]):
+            if blower_duration > max_duration:
                 return jsonify({
                     'status': 'error',
                     'message': f'Duration parameters cannot exceed {max_duration} seconds for safety'
                 }), 400
 
-            # Start the feeder process (actuator timings are fixed in Arduino: 5s up, 10s down)
+            # Start the feeder process (solenoid valve timings are fixed in Arduino: 5s open, 10s close)
             result = self.feeder_service.start(
                 feed_size=feed_size,
-                auger_duration=auger_duration,
                 blower_duration=blower_duration
             )
 

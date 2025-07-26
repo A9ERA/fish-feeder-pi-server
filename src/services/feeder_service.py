@@ -28,13 +28,12 @@ class FeederService:
         self._lock = threading.Lock()
         self.is_running = False
 
-    def start(self, feed_size: int, auger_duration: int, blower_duration: int) -> dict:
+    def start(self, feed_size: int, blower_duration: int) -> dict:
         """
         Start the feeding process sequence
         
         Args:
             feed_size: Feed size in grams (for reference/logging)
-            auger_duration: Duration in seconds for auger operation
             blower_duration: Duration in seconds for blower operation
             
         Returns:
@@ -58,8 +57,8 @@ class FeederService:
         video_file = None
         try:
             print(f"[Feeder Service] Starting feeding process...")
-            print(f"Feed size: {feed_size}g, Auger duration: {auger_duration}s, Blower duration: {blower_duration}s")
-            print(f"Note: Actuator timings are fixed at 5s up and 10s down in Arduino")
+            print(f"Feed size: {feed_size}g, Blower duration: {blower_duration}s")
+            print(f"Note: Solenoid valve timings are fixed at 5s open and 10s close in Arduino")
 
             # Start video recording
             try:
@@ -68,8 +67,8 @@ class FeederService:
             except Exception as video_error:
                 print(f"[Feeder Service] Warning: Failed to start video recording: {video_error}")
 
-            # Send feeder start command to Arduino with parameters (only auger and blower durations)
-            feeder_params = f"{auger_duration},{blower_duration}"
+            # Send feeder start command to Arduino with parameters (only blower duration)
+            feeder_params = f"{blower_duration}"
             command = f"feeder:start:{feeder_params}"
             
             print(f"[Feeder Service] Sending command to Arduino: [control]:{command}")
@@ -77,10 +76,10 @@ class FeederService:
                 raise Exception("Failed to send feeder start command to Arduino")
             
             # Calculate total estimated duration (with some buffer)
-            # Using fixed actuator timings: actuator_up=5, actuator_down=10
-            actuator_up = 5
-            actuator_down = 10
-            total_duration = actuator_up + actuator_down + max(auger_duration, blower_duration)
+            # Using fixed solenoid valve timings: solenoid_open=5, solenoid_close=10
+            solenoid_open = 5
+            solenoid_close = 10
+            total_duration = solenoid_open + solenoid_close + blower_duration
             buffer_time = 5  # Extra 5 seconds buffer
             estimated_duration = total_duration + buffer_time
             
@@ -104,9 +103,8 @@ class FeederService:
             video_filename = Path(video_file).name if video_file else ""
             self.history_service.log_feed_operation(
                 feed_size=feed_size,
-                actuator_up=actuator_up,
-                actuator_down=actuator_down,
-                auger_duration=auger_duration,
+                solenoid_open=solenoid_open,
+                solenoid_close=solenoid_close,
                 blower_duration=blower_duration,
                 status='success',
                 message='Feeding process completed successfully (Arduino controlled)',
@@ -119,11 +117,11 @@ class FeederService:
                 'feed_size': feed_size,
                 'video_file': video_file,
                 'total_duration': estimated_duration,
-                'steps_completed': [
+                                'steps_completed': [
                     f"Arduino controlled sequence:",
-                    f"  - Actuator up: {actuator_up}s (fixed)",
-                    f"  - Actuator down: {actuator_down}s (fixed)", 
-                    f"  - Auger forward & Blower (simultaneous): {auger_duration}s & {blower_duration}s"
+                    f"  - Solenoid valve open: {solenoid_open}s (fixed)",
+                    f"  - Solenoid valve close: {solenoid_close}s (fixed)",
+                    f"  - Blower: {blower_duration}s"
                 ]
             }
 
@@ -146,14 +144,13 @@ class FeederService:
             except:
                 print(f"[Feeder Service] Failed to send emergency stop command to Arduino")
             
-            # Log failed feed operation (use fixed actuator values for logging)
+            # Log failed feed operation (use fixed solenoid valve values for logging)
             # Extract only filename from full path for CSV storage
             video_filename = Path(video_file).name if video_file else ""
             self.history_service.log_feed_operation(
                 feed_size=feed_size,
-                actuator_up=5,  # Fixed value
-                actuator_down=10,  # Fixed value
-                auger_duration=auger_duration,
+                solenoid_open=5,  # Fixed value
+                solenoid_close=10,  # Fixed value
                 blower_duration=blower_duration,
                 status='error',
                 message=error_msg,
