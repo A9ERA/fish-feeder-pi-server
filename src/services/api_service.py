@@ -423,7 +423,7 @@ class APIService:
 
             data = request.get_json()
             
-            # Extract parameters from request (solenoid valve timings are now fixed in Arduino)
+            # Extract parameters from request (using weight-based control)
             feed_size = data.get('feedSize')
             blower_duration = data.get('blowerDuration')
 
@@ -434,7 +434,7 @@ class APIService:
             ]):
                 return jsonify({
                     'status': 'error',
-                    'message': 'All parameters are required: feedSize, blowerDuration (solenoid valve timings are fixed at 5s open, 10s close)'
+                    'message': 'All parameters are required: feedSize, blowerDuration (solenoid valve uses weight-based control)'
                 }), 400
 
             # Validate parameter types and values
@@ -465,7 +465,7 @@ class APIService:
                     'message': f'Duration parameters cannot exceed {max_duration} seconds for safety'
                 }), 400
 
-            # Start the feeder process (solenoid valve timings are fixed in Arduino: 5s open, 10s close)
+            # Start the feeder process (using weight-based control)
             result = self.feeder_service.start(
                 feed_size=feed_size,
                 blower_duration=blower_duration

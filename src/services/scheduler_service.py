@@ -414,8 +414,8 @@ class SchedulerService:
                     
                     logger.info(f"[Scheduler] Feeding parameters for schedule {schedule_id}:")
                     logger.info(f"  Feed size: {feed_size}g")
-                    logger.info(f"  Solenoid valve open: 5s (fixed)")
-                    logger.info(f"  Solenoid valve close: 10s (fixed)")
+                    logger.info(f"  Solenoid valve open: until {feed_size}g weight reduction (weight-based)")
+                    logger.info(f"  Solenoid valve close: 12s (fixed)")
                     logger.info(f"  Blower duration: {blower_duration}s")
                     
                     # Execute feeding process
