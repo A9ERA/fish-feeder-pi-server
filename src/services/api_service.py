@@ -321,7 +321,7 @@ class APIService:
                 }), 400
 
             # Validate actions
-            valid_actions = ['open', 'close', 'stop']
+            valid_actions = ['open', 'close']
             if action not in valid_actions:
                 return jsonify({
                     'status': 'error',

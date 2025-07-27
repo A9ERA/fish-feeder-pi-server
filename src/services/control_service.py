@@ -67,10 +67,6 @@ class ControlService:
         """Close solenoid valve"""
         return self._send_command("solenoid:close")
 
-    def solenoid_stop(self) -> bool:
-        """Stop solenoid valve"""
-        return self._send_command("solenoid:stop")
-
     # Relay control methods
     def relay_led_on(self) -> bool:
         """Turn LED relay on"""
@@ -123,14 +119,12 @@ class ControlService:
         Control solenoid valve with a single method
         
         Args:
-            action: Action to perform ('open', 'close', 'stop')
+            action: Action to perform ('open', 'close')
         """
         if action == "open":
             return self.solenoid_open()
         elif action == "close":
             return self.solenoid_close()
-        elif action == "stop":
-            return self.solenoid_stop()
         else:
             print(f"Unknown solenoid action: {action}")
             return False
