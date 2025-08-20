@@ -58,7 +58,7 @@ class FeederService:
         try:
             print(f"[Feeder Service] Starting feeding process...")
             print(f"Feed size: {feed_size}g, Blower duration: {blower_duration}s")
-            print(f"Note: Using weight-based control - solenoid valve open until {feed_size}g weight reduction")
+            print(f"Note: Using weight-based control - feeder motor open until {feed_size}g weight reduction")
 
             # Start video recording
             try:
@@ -76,11 +76,11 @@ class FeederService:
                 raise Exception("Failed to send feeder start command to Arduino")
             
             # Calculate total estimated duration (with some buffer)
-            # Using weight-based control: no fixed time for solenoid open, only close=12s
-            solenoid_close = 12
-            # Estimate solenoid open time based on feed size (rough estimate: 1g per second)
-            estimated_solenoid_open = min(feed_size, 30)  # Cap at 30 seconds max
-            total_duration = estimated_solenoid_open + solenoid_close + blower_duration
+            # Using weight-based control: no fixed time for feeder motor open, only close=12s
+            feedermotor_close = 12
+            # Estimate feeder motor open time based on feed size (rough estimate: 1g per second)
+            estimated_feedermotor_open = min(feed_size, 30)  # Cap at 30 seconds max
+            total_duration = estimated_feedermotor_open + feedermotor_close + blower_duration
             buffer_time = 5  # Extra 5 seconds buffer
             estimated_duration = total_duration + buffer_time
             
@@ -104,8 +104,8 @@ class FeederService:
             video_filename = Path(video_file).name if video_file else ""
             self.history_service.log_feed_operation(
                 feed_size=feed_size,
-                solenoid_open=estimated_solenoid_open,  # Estimated time
-                solenoid_close=solenoid_close,
+                feedermotor_open=estimated_feedermotor_open,  # Estimated time
+                feedermotor_close=feedermotor_close,
                 blower_duration=blower_duration,
                 status='success',
                 message='Feeding process completed successfully (Arduino controlled)',
@@ -118,10 +118,10 @@ class FeederService:
                 'feed_size': feed_size,
                 'video_file': video_file,
                 'total_duration': estimated_duration,
-                                'steps_completed': [
+                'steps_completed': [
                     f"Arduino controlled sequence:",
-                    f"  - Solenoid valve open: until {feed_size}g weight reduction (weight-based)",
-                    f"  - Solenoid valve close: {solenoid_close}s (fixed)",
+                    f"  - Feeder motor open: until {feed_size}g weight reduction (weight-based)",
+                    f"  - Feeder motor close: {feedermotor_close}s (fixed)",
                     f"  - Blower: {blower_duration}s"
                 ]
             }
@@ -145,13 +145,13 @@ class FeederService:
             except:
                 print(f"[Feeder Service] Failed to send emergency stop command to Arduino")
             
-            # Log failed feed operation (use fixed solenoid valve values for logging)
+            # Log failed feed operation (use fixed feeder motor values for logging)
             # Extract only filename from full path for CSV storage
             video_filename = Path(video_file).name if video_file else ""
             self.history_service.log_feed_operation(
                 feed_size=feed_size,
-                solenoid_open=5,  # Fixed value
-                solenoid_close=12,  # Fixed value
+                feedermotor_open=5,  # Fixed value
+                feedermotor_close=12,  # Fixed value
                 blower_duration=blower_duration,
                 status='error',
                 message=error_msg,

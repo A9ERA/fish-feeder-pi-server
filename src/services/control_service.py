@@ -58,14 +58,16 @@ class ControlService:
         """Set blower direction to normal"""
         return self._send_command("blower:direction:normal")
 
-    # Solenoid valve control methods (updated to match Arduino commands)
-    def solenoid_open(self) -> bool:
-        """Open solenoid valve"""
-        return self._send_command("solenoid:open")
+    # Feeder motor control methods
+    def feedermotor_open(self) -> bool:
+        """Open feeder motor (CW to dispense)"""
+        return self._send_command("feedermotor:open")
 
-    def solenoid_close(self) -> bool:
-        """Close solenoid valve"""
-        return self._send_command("solenoid:close")
+    def feedermotor_close(self) -> bool:
+        """Close feeder motor (CCW to stop/close)"""
+        return self._send_command("feedermotor:close")
+
+    # Removed solenoid_* methods; use feedermotor_* instead
 
     # Relay control methods
     def relay_led_on(self) -> bool:
@@ -114,19 +116,19 @@ class ControlService:
             print(f"Unknown blower action: {action}")
             return False
 
-    def control_solenoid(self, action: str) -> bool:
+    def control_feedermotor(self, action: str) -> bool:
         """
-        Control solenoid valve with a single method
+        Control feeder motor with a single method
         
         Args:
             action: Action to perform ('open', 'close')
         """
         if action == "open":
-            return self.solenoid_open()
+            return self.feedermotor_open()
         elif action == "close":
-            return self.solenoid_close()
+            return self.feedermotor_close()
         else:
-            print(f"Unknown solenoid action: {action}")
+            print(f"Unknown feedermotor action: {action}")
             return False
 
     def control_relay(self, device: str, action: str) -> bool:

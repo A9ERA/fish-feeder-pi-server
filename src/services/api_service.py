@@ -54,7 +54,8 @@ class APIService:
         
         # Device control routes
         self.app.route('/api/control/blower', methods=['POST'])(self.control_blower)
-        self.app.route('/api/control/solenoid', methods=['POST'])(self.control_solenoid)
+        # New feeder motor route
+        self.app.route('/api/control/feedermotor', methods=['POST'])(self.control_feedermotor)
         self.app.route('/api/control/relay', methods=['POST'])(self.control_relay)
         self.app.route('/api/control/sensor', methods=['POST'])(self.control_sensor)
         self.app.route('/api/control/weight', methods=['POST'])(self.control_weight)
@@ -302,8 +303,8 @@ class APIService:
                 'message': f'Error controlling blower: {str(e)}'
             }), 500
 
-    def control_solenoid(self):
-        """Control solenoid valve device via API"""
+    def control_feedermotor(self):
+        """Control feeder motor device via API"""
         try:
             if not request.is_json:
                 return jsonify({
@@ -329,12 +330,12 @@ class APIService:
                 }), 400
 
             # Send command via control service
-            success = self.control_service.control_solenoid(action)
+            success = self.control_service.control_feedermotor(action)
 
             if success:
                 return jsonify({
                     'status': 'success',
-                    'message': f"Solenoid valve {action} command sent successfully"
+                    'message': f"Feeder motor {action} command sent successfully"
                 })
             else:
                 return jsonify({
@@ -345,8 +346,10 @@ class APIService:
         except Exception as e:
             return jsonify({
                 'status': 'error',
-                'message': f'Error controlling solenoid valve: {str(e)}'
+                'message': f'Error controlling feeder motor: {str(e)}'
             }), 500
+
+    
 
 
 
@@ -434,7 +437,7 @@ class APIService:
             ]):
                 return jsonify({
                     'status': 'error',
-                    'message': 'All parameters are required: feedSize, blowerDuration (solenoid valve uses weight-based control)'
+                    'message': 'All parameters are required: feedSize, blowerDuration (feeder motor uses weight-based control)'
                 }), 400
 
             # Validate parameter types and values

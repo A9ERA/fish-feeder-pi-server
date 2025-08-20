@@ -28,8 +28,8 @@ class FeederHistoryService:
             row_data = {
                 'timestamp': feed_data['timestamp'],
                 'amount_g': feed_data['amount'],
-                'solenoid_open_s': feed_data['solenoid_open'],
-                'solenoid_close_s': feed_data['solenoid_close'],
+                'feedermotor_open_s': feed_data['feedermotor_open'],
+                'feedermotor_close_s': feed_data['feedermotor_close'],
                 'blower_duration_s': feed_data['blower_duration'],
                 'status': feed_data['status'],
                 'message': feed_data.get('message', ''),
@@ -67,8 +67,8 @@ class FeederHistoryService:
         except Exception as e:
             print(f"[❌][Feeder History] Error writing CSV data: {e}")
     
-    def log_feed_operation(self, feed_size: int, solenoid_open: float, solenoid_close: float, 
-                          blower_duration: float, status: str, message: str = "", video_file: str = ""):
+    def log_feed_operation(self, feed_size: int, feedermotor_open: float, feedermotor_close: float, 
+                         blower_duration: float, status: str, message: str = "", video_file: str = ""):
         """Log a feed operation to CSV file"""
         try:
             current_time = datetime.datetime.now()
@@ -87,8 +87,8 @@ class FeederHistoryService:
             feed_data = {
                 'timestamp': current_time.strftime("%Y-%m-%d %H:%M:%S"),
                 'amount': feed_size,
-                'solenoid_open': solenoid_open,
-                'solenoid_close': solenoid_close,
+                'feedermotor_open': feedermotor_open,
+                'feedermotor_close': feedermotor_close,
                 'blower_duration': blower_duration,
                 'status': status,
                 'message': message,
@@ -136,8 +136,8 @@ class FeederHistoryService:
                         feed_log = {
                             'timestamp': row['timestamp'],
                             'amount': int(float(row['amount_g'])),
-                            'solenoid_open': float(row['solenoid_open_s']),
-                            'solenoid_close': float(row['solenoid_close_s']),
+                            'feedermotor_open': float(row['feedermotor_open_s']),
+                            'feedermotor_close': float(row['feedermotor_close_s']),
                             'blower_duration': float(row['blower_duration_s']),
                             'status': row['status'],
                             'message': row.get('message', ''),

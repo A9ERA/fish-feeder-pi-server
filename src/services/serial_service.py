@@ -537,12 +537,12 @@ class SerialService:
                                 cmd_data['completed'] = True
             else:
                 # Handle other Arduino messages
-                if any(prefix in data for prefix in ["[SOLENOID]", "[RELAY]", "[BLOWER]"]):
+                if any(prefix in data for prefix in ["[FEEDERMOTOR]", "[RELAY]", "[BLOWER]"]):
                     print(f"[Arduino] {data}")
                     
         except json.JSONDecodeError:
             # Don't spam with JSON errors for non-JSON Arduino messages
-            if not any(prefix in data for prefix in ["[SOLENOID]", "[RELAY]", "[BLOWER]", "[INFO]"]):
+            if not any(prefix in data for prefix in ["[FEEDERMOTOR]", "[RELAY]", "[BLOWER]", "[INFO]"]):
                 print(f"⚠️ Invalid JSON data received: {data}")
         except Exception as e:
             print(f"❌ Error processing serial data: {e}")

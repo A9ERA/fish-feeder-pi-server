@@ -48,27 +48,18 @@ def test_blower_controls(ser):
     # Test blower stop
     send_command(ser, "[control]:blower:stop\n")
 
-def test_solenoid_controls(ser):
-    """Test all solenoid valve control commands"""
-    print("=== Testing Solenoid Valve Controls ===")
+def test_feedermotor_controls(ser):
+    """Test feeder motor control commands"""
+    print("=== Testing Feeder Motor Controls ===")
     
-    # Test solenoid open
-    send_command(ser, "[control]:solenoid:open\n")
-    
-    # Wait a bit
-    time.sleep(1)
-    
-    # Test solenoid stop
-    send_command(ser, "[control]:solenoid:stop\n")
-    
-    # Test solenoid close
-    send_command(ser, "[control]:solenoid:close\n")
+    # Test feeder motor open
+    send_command(ser, "[control]:feedermotor:open\n")
     
     # Wait a bit
     time.sleep(1)
     
-    # Test solenoid stop
-    send_command(ser, "[control]:solenoid:stop\n")
+    # Test feeder motor close (auto stop handled on Arduino)
+    send_command(ser, "[control]:feedermotor:close\n")
 
 def test_invalid_commands(ser):
     """Test invalid commands to see how Arduino handles them"""
@@ -117,8 +108,8 @@ def main():
         test_blower_controls(ser)
         time.sleep(1)
         
-        # Test solenoid controls
-        test_solenoid_controls(ser)
+        # Test feeder motor controls
+        test_feedermotor_controls(ser)
         time.sleep(1)
         
         # Test invalid commands
