@@ -12,6 +12,7 @@ import json5  # Add json5 for JSONC support
 from firebase_admin import db
 from .firebase_service import FirebaseService
 from .sensor_history_service import SensorHistoryService
+from typing import Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +48,8 @@ class SchedulerService:
         # Global variables for system status monitoring
         self.current_fan_is_on = False
         self.current_led_is_on = False
+        # Track last evaluated alert states to reduce redundant writes
+        self._last_alert_state: Dict[str, Any] = {}
 
     def _get_app_settings(self) -> Dict[str, Any]:
         """
@@ -274,6 +277,190 @@ class SchedulerService:
         except Exception as e:
             logger.error(f"[Scheduler] Error in system status monitor job: {str(e)}")
 
+    def _read_current_sensor_values(self) -> Dict[str, Any]:
+        """Read current sensor readings from local sensors_data.jsonc file."""
+        sensors_file = Path(__file__).parent.parent / 'data' / 'sensors_data.jsonc'
+        if not sensors_file.exists():
+            return {}
+        try:
+            with open(sensors_file, 'r', encoding='utf-8') as f:
+                content = f.read().strip()
+                if not content:
+                    return {}
+                return json5.loads(content)
+        except Exception as e:
+            logger.error(f"[Scheduler] Failed reading sensors data for alerts: {e}")
+            return {}
+
+    def _get_alert_settings(self) -> Dict[str, Any]:
+        """Get alert settings from Firebase under /app_setting/alert with fallback defaults."""
+        try:
+            ref = db.reference('/app_setting/alert')
+            data = ref.get() or {}
+            # Defaults if not present
+            dht = data.get('dht22_feeder_humidity', {})
+            soil = data.get('soil_moisture', {})
+            return {
+                'dht22_feeder_humidity': {
+                    'warning': int(dht.get('warning', 70)),
+                    'critical': int(dht.get('critical', 85)),
+                },
+                'soil_moisture': {
+                    'warning': int(soil.get('warning', 60)),
+                    'critical': int(soil.get('critical', 80)),
+                }
+            }
+        except Exception as e:
+            logger.warning(f"[Scheduler] Failed to get alert settings, using defaults: {e}")
+            return {
+                'dht22_feeder_humidity': {'warning': 70, 'critical': 85},
+                'soil_moisture': {'warning': 60, 'critical': 80}
+            }
+
+    def _evaluate_level(self, value: float, warn: float, crit: float) -> str:
+        if value >= crit:
+            return 'critical'
+        if value >= warn:
+            return 'warning'
+        return 'normal'
+
+    def _write_alert_log(self, log_item: Dict[str, Any]) -> str:
+        """Append alert log under /alerts/logs and return generated id."""
+        try:
+            logs_ref = db.reference('/alerts/logs')
+            new_ref = logs_ref.push(log_item)
+            return new_ref.key or ''
+        except Exception as e:
+            logger.error(f"[Scheduler] Failed writing alert log: {e}")
+            return ''
+
+    def _alerts_monitor_job(self):
+        """Monitor dht22_feeder humidity and soil_moisture to manage alerts and ack state."""
+        try:
+            sensors_data = self._read_current_sensor_values()
+            if not sensors_data:
+                return
+
+            sensors = sensors_data.get('sensors', {})
+            # Extract values
+            def get_value(sensor_name: str, type_name: str) -> float:
+                sensor = sensors.get(sensor_name, {})
+                values = sensor.get('values', [])
+                for v in values:
+                    if v.get('type') == type_name:
+                        try:
+                            return float(v.get('value', 0))
+                        except Exception:
+                            return 0.0
+                return 0.0
+
+            feeder_humi = get_value('DHT22_FEEDER', 'humidity')
+            soil_moist = get_value('SOIL_MOISTURE', 'soil_moisture')
+
+            settings = self._get_alert_settings()
+            now_iso = datetime.datetime.now().isoformat()
+
+            # Firebase paths
+            active_ref = db.reference('/alerts/active')
+            ack_ref = db.reference('/alerts/acknowledged')
+
+            # Load existing state
+            active_state = active_ref.get() or {}
+            ack_state = ack_ref.get() or {}
+
+            # Helper to process a single key
+            def process(sensor_key: str, value: float):
+                thresholds = settings.get(sensor_key, {})
+                level = self._evaluate_level(value, thresholds.get('warning', 0), thresholds.get('critical', 0))
+
+                prev = active_state.get(sensor_key)
+                prev_level = prev.get('level') if isinstance(prev, dict) else 'normal'
+                alert_id = prev.get('alert_id') if isinstance(prev, dict) else None
+
+                # Transition logic
+                if level == 'normal':
+                    # Resolve: remove active entry, keep log
+                    if prev and prev_level != 'normal':
+                        # write resolve log
+                        if alert_id:
+                            self._write_alert_log({
+                                'alert_id': alert_id,
+                                'sensorKey': sensor_key,
+                                'level': 'normal',
+                                'value': value,
+                                'thresholds': thresholds,
+                                'timestamp': now_iso,
+                                'action': 'resolve'
+                            })
+                    # Clear active
+                    if sensor_key in active_state:
+                        active_state.pop(sensor_key, None)
+                else:
+                    # Create or update active
+                    new_level = level
+                    if prev and alert_id:
+                        # existing alert
+                        if prev_level != new_level:
+                            # Escalate from warning -> critical
+                            if prev_level == 'warning' and new_level == 'critical':
+                                # write escalate log
+                                self._write_alert_log({
+                                    'alert_id': alert_id,
+                                    'sensorKey': sensor_key,
+                                    'level': new_level,
+                                    'value': value,
+                                    'thresholds': thresholds,
+                                    'timestamp': now_iso,
+                                    'action': 'escalate'
+                                })
+                            # Downgrade to warning (rare within else, handled above by normal path), but we keep active with warning
+                        # Update active
+                        active_state[sensor_key] = {
+                            'sensorKey': sensor_key,
+                            'level': new_level,
+                            'value': value,
+                            'thresholds': thresholds,
+                            'alert_id': alert_id,
+                            'acknowledged': bool(prev.get('acknowledged', False)),
+                            'last_updated': now_iso,
+                            'timestamp_first_seen': prev.get('timestamp_first_seen') or now_iso
+                        }
+                        # If escalated to critical, mark any pending warning acknowledgement as irrelevant by setting acknowledged true
+                        if new_level == 'critical':
+                            ack_state[sensor_key] = {'alert_id': alert_id, 'acknowledged': True, 'level': 'critical', 'timestamp': now_iso}
+                    else:
+                        # create new alert entry and log
+                        # generate alert id by pushing a log first
+                        tmp_id = self._write_alert_log({
+                            'sensorKey': sensor_key,
+                            'level': level,
+                            'value': value,
+                            'thresholds': thresholds,
+                            'timestamp': now_iso,
+                            'action': 'trigger'
+                        })
+                        new_alert_id = tmp_id or f"{sensor_key}-{int(time.time())}"
+                        active_state[sensor_key] = {
+                            'sensorKey': sensor_key,
+                            'level': new_level,
+                            'value': value,
+                            'thresholds': thresholds,
+                            'alert_id': new_alert_id,
+                            'acknowledged': False,
+                            'timestamp_first_seen': now_iso,
+                            'last_updated': now_iso
+                        }
+
+            process('dht22_feeder_humidity', feeder_humi)
+            process('soil_moisture', soil_moist)
+
+            # Write back active and ack states
+            active_ref.set(active_state)
+            ack_ref.set(ack_state)
+
+        except Exception as e:
+            logger.error(f"[Scheduler] Error in alerts monitor job: {str(e)}")
+
     def _run_sensor_history_job_with_timing(self):
         """Run sensor history job only on seconds divisible by 5"""
         while not self._stop_events.get('sensorHistory', threading.Event()).is_set():
@@ -487,7 +674,8 @@ class SchedulerService:
             ('syncSchedule', self._sync_schedule_job, self._current_settings['syncSchedule']),
             ('syncFeedPreset', self._sync_feed_preset_job, self._current_settings['syncFeedPreset']),
             ('runFeedSchedule', self.run_feed_schedule_job, 1),
-            ('systemStatusMonitor', self._system_status_monitor_job, 1)
+            ('systemStatusMonitor', self._system_status_monitor_job, 1),
+            ('alertsMonitor', self._alerts_monitor_job, 1)
         ]
         
         for job_name, job_func, interval in jobs:
