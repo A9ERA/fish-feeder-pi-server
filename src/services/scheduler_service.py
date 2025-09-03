@@ -300,6 +300,7 @@ class SchedulerService:
             # Defaults if not present
             dht = data.get('dht22_feeder_humidity', {})
             soil = data.get('soil_moisture', {})
+            food = data.get('food_weight', {})
             return {
                 'dht22_feeder_humidity': {
                     'warning': int(dht.get('warning', 70)),
@@ -308,13 +309,19 @@ class SchedulerService:
                 'soil_moisture': {
                     'warning': int(soil.get('warning', 60)),
                     'critical': int(soil.get('critical', 80)),
-                }
+                },
+                'food_weight': {
+                    # thresholds in kilograms: alert when value is LOW (≤ threshold)
+                    'warning': float(food.get('warning', 3.0)),
+                    'critical': float(food.get('critical', 2.0)),
+                },
             }
         except Exception as e:
             logger.warning(f"[Scheduler] Failed to get alert settings, using defaults: {e}")
             return {
                 'dht22_feeder_humidity': {'warning': 70, 'critical': 85},
-                'soil_moisture': {'warning': 60, 'critical': 80}
+                'soil_moisture': {'warning': 60, 'critical': 80},
+                'food_weight': {'warning': 3.0, 'critical': 2.0},
             }
 
     def _evaluate_level(self, value: float, warn: float, crit: float) -> str:
@@ -335,7 +342,7 @@ class SchedulerService:
             return ''
 
     def _alerts_monitor_job(self):
-        """Monitor dht22_feeder humidity and soil_moisture to manage alerts and ack state."""
+        """Monitor humidity, soil moisture, and food weight (HX711) to manage alerts and ack state."""
         try:
             sensors_data = self._read_current_sensor_values()
             if not sensors_data:
@@ -356,6 +363,8 @@ class SchedulerService:
 
             feeder_humi = get_value('DHT22_FEEDER', 'humidity')
             soil_moist = get_value('SOIL_MOISTURE', 'soil_moisture')
+            # HX711 weight (kg). Use absolute value to avoid negative readings due to calibration offsets
+            food_weight_val = abs(get_value('HX711_FEEDER', 'weight'))
 
             settings = self._get_alert_settings()
             now_iso = datetime.datetime.now().isoformat()
@@ -369,9 +378,20 @@ class SchedulerService:
             ack_state = ack_ref.get() or {}
 
             # Helper to process a single key
-            def process(sensor_key: str, value: float):
+            # mode: 'high' -> alert when value is HIGH (>= threshold); 'low' -> alert when value is LOW (<= threshold)
+            def process(sensor_key: str, value: float, mode: str = 'high'):
                 thresholds = settings.get(sensor_key, {})
-                level = self._evaluate_level(value, thresholds.get('warning', 0), thresholds.get('critical', 0))
+                if mode == 'low':
+                    crit = thresholds.get('critical', 0)
+                    warn = thresholds.get('warning', 0)
+                    if value <= crit:
+                        level = 'critical'
+                    elif value <= warn:
+                        level = 'warning'
+                    else:
+                        level = 'normal'
+                else:
+                    level = self._evaluate_level(value, thresholds.get('warning', 0), thresholds.get('critical', 0))
 
                 prev = active_state.get(sensor_key)
                 prev_level = prev.get('level') if isinstance(prev, dict) else 'normal'
@@ -453,6 +473,8 @@ class SchedulerService:
 
             process('dht22_feeder_humidity', feeder_humi)
             process('soil_moisture', soil_moist)
+            # For food weight, we alert when weight is low (≤ threshold)
+            process('food_weight', food_weight_val, mode='low')
 
             # Write back active and ack states
             active_ref.set(active_state)
