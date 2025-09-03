@@ -37,16 +37,16 @@ class ChartDataService:
             df['timestamp'] = pd.to_datetime(df['timestamp'])
             
             # Calculate solar power (watts) = solarVoltage_V * solarCurrent_A
-            df['solarGeneration'] = df['solarVoltage_V'] * df['solarCurrent_A']
+            df['solarGeneration'] = df['solarVoltage_V']
             
             # Calculate feeder consumption (watts) = loadVoltage_V * loadCurrent_A
-            df['feederConsumption'] = df['loadVoltage_V'] * df['loadCurrent_A']
+            # df['feederConsumption'] = df['loadVoltage_V'] * df['loadCurrent_A']
             
             # Group by hour and take average values
             df['hour'] = df['timestamp'].dt.hour
             hourly_data = df.groupby('hour').agg({
                 'solarGeneration': 'mean',
-                'feederConsumption': 'mean'
+                # 'feederConsumption': 'mean'
             }).reset_index()
             
             # Determine max hour to show
@@ -69,7 +69,7 @@ class ChartDataService:
                 
                 if not hour_data.empty:
                     solar_gen = round(hour_data.iloc[0]['solarGeneration'], 2)
-                    feeder_cons = round(hour_data.iloc[0]['feederConsumption'], 2)
+                    # feeder_cons = round(hour_data.iloc[0]['feederConsumption'], 2)
                 else:
                     # No data for this hour, use default values
                     solar_gen = 0.0
@@ -78,7 +78,7 @@ class ChartDataService:
                 result.append({
                     'time': time_str,
                     'solarGeneration': solar_gen,
-                    'feederConsumption': feeder_cons
+                    # 'feederConsumption': feeder_cons
                 })
             
             return {
