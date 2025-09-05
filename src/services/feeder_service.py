@@ -57,7 +57,7 @@ class FeederService:
                 return None
 
             feeder_humi = get_value('DHT22_FEEDER', 'humidity')
-            food_moisture = get_value('SOIL_MOISTURE', 'moisture')
+            food_moisture = get_value('SOIL_MOISTURE', 'soil_moisture')
             food_weight_kg = get_value('HX711_FEEDER', 'weight')
             if food_weight_kg is not None:
                 try:
