@@ -12,6 +12,7 @@ import json5  # Add json5 for JSONC support
 from firebase_admin import db
 from .firebase_service import FirebaseService
 from .sensor_history_service import SensorHistoryService
+from .refill_history_service import RefillHistoryService
 from typing import Tuple
 
 logger = logging.getLogger(__name__)
@@ -28,6 +29,7 @@ class SchedulerService:
         self.firebase_service = firebase_service or FirebaseService()
         self.api_service = api_service
         self.sensor_history_service = SensorHistoryService()
+        self.refill_history_service = RefillHistoryService()
         self._running = False
         self._threads = {}
         self._stop_events = {}
@@ -50,6 +52,9 @@ class SchedulerService:
         self.current_led_is_on = False
         # Track last evaluated alert states to reduce redundant writes
         self._last_alert_state: Dict[str, Any] = {}
+        # Track last HX711 weight for refill detection
+        self._last_hx711_weight_kg: Optional[float] = None
+        self._last_refill_log_time: float = 0.0
 
     def _get_app_settings(self) -> Dict[str, Any]:
         """
@@ -522,6 +527,54 @@ class SchedulerService:
                 logger.error(f"[Scheduler] Error in sensor history timing job: {str(e)}")
                 time.sleep(1)  # Sleep 1 second on error to prevent rapid loop
 
+    def _refill_monitor_job(self):
+        """Monitor HX711_FEEDER weight increase to detect food refills and log when increase > 1.0 kg."""
+        try:
+            sensors_data = self._read_current_sensor_values()
+            if not sensors_data:
+                return
+
+            sensors = sensors_data.get('sensors', {})
+            hx = sensors.get('HX711_FEEDER', {})
+            values = hx.get('values', [])
+            current_weight = None
+            for v in values:
+                if v.get('type') == 'weight':
+                    try:
+                        current_weight = abs(float(v.get('value', 0)))
+                    except Exception:
+                        current_weight = None
+                    break
+
+            if current_weight is None:
+                return
+
+            # Initialize baseline
+            if self._last_hx711_weight_kg is None:
+                self._last_hx711_weight_kg = current_weight
+                return
+
+            previous_weight = self._last_hx711_weight_kg
+            increase = current_weight - previous_weight
+
+            # Thresholds
+            threshold_kg = 1.0
+            min_interval_sec = 60  # avoid duplicate logs within short period
+
+            now_ts = time.time()
+            if increase >= threshold_kg and (now_ts - self._last_refill_log_time) >= min_interval_sec:
+                try:
+                    self.refill_history_service.log_refill(weight_before_kg=previous_weight, weight_after_kg=current_weight)
+                    self._last_refill_log_time = now_ts
+                    logger.info(f"[Scheduler] Refill detected and logged: +{increase:.3f} kg ({previous_weight:.3f} -> {current_weight:.3f})")
+                except Exception as log_err:
+                    logger.error(f"[Scheduler] Failed to log refill: {log_err}")
+
+            # Update last weight after processing
+            self._last_hx711_weight_kg = current_weight
+        except Exception as e:
+            logger.error(f"[Scheduler] Error in refill monitor job: {str(e)}")
+
     def run_feed_schedule_job(self):
         """
         Job function for running scheduled feeding based on schedule_data.jsonc
@@ -697,7 +750,8 @@ class SchedulerService:
             ('syncFeedPreset', self._sync_feed_preset_job, self._current_settings['syncFeedPreset']),
             ('runFeedSchedule', self.run_feed_schedule_job, 1),
             ('systemStatusMonitor', self._system_status_monitor_job, 1),
-            ('alertsMonitor', self._alerts_monitor_job, 1)
+            ('alertsMonitor', self._alerts_monitor_job, 1),
+            ('refillMonitor', self._refill_monitor_job, 1)
         ]
         
         for job_name, job_func, interval in jobs:

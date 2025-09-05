@@ -14,6 +14,7 @@ from .feeder_service import FeederService
 from .scheduler_service import SchedulerService
 from .chart_data_service import ChartDataService
 from .feeder_history_service import FeederHistoryService
+from .refill_history_service import RefillHistoryService
 
 class APIService:
     def __init__(self, host='0.0.0.0', port=5000, serial_service=None):
@@ -35,6 +36,7 @@ class APIService:
         self.scheduler_service = SchedulerService(self.firebase_service, self)  # Initialize scheduler service
         self.chart_data_service = ChartDataService()  # Initialize chart data service
         self.feeder_history_service = FeederHistoryService()  # Initialize feeder history service
+        self.refill_history_service = RefillHistoryService()  # Initialize refill history service
         
         # Health check route
         self.app.route('/')(self.index)
@@ -84,6 +86,10 @@ class APIService:
         # Feed history routes
         self.app.route('/api/feed-history/<date>', methods=['GET'])(self.get_feed_history)
         self.app.route('/api/feed-history/available-dates', methods=['GET'])(self.get_feed_history_dates)
+        
+        # Refill history routes
+        self.app.route('/api/refill-history/<date>', methods=['GET'])(self.get_refill_history)
+        self.app.route('/api/refill-history/available-dates', methods=['GET'])(self.get_refill_history_dates)
         
         # Video serving routes
         self.app.route('/api/feed-video/<filename>', methods=['GET'])(self.serve_feed_video)
@@ -788,6 +794,50 @@ class APIService:
                 'dates': dates
             })
             
+        except Exception as e:
+            return jsonify({
+                'status': 'error',
+                'message': f'Error retrieving available dates: {str(e)}',
+                'dates': []
+            }), 500
+
+    def get_refill_history(self, date):
+        """Get refill (weight increase) history for a specific date (DD-MM-YYYY)."""
+        try:
+            from datetime import datetime
+            try:
+                date_obj = datetime.strptime(date, "%d-%m-%Y")
+            except ValueError:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Invalid date format. Use DD-MM-YYYY format (e.g., 21-06-2025)',
+                    'data': []
+                }), 400
+
+            logs = self.refill_history_service.read_history(date_obj)
+            return jsonify({
+                'status': 'success',
+                'message': f'Refill history retrieved for {date}',
+                'date': date,
+                'total_records': len(logs),
+                'data': logs
+            })
+        except Exception as e:
+            return jsonify({
+                'status': 'error',
+                'message': f'Error retrieving refill history: {str(e)}',
+                'data': []
+            }), 500
+
+    def get_refill_history_dates(self):
+        """Get list of available dates for refill history."""
+        try:
+            dates = self.refill_history_service.get_available_dates()
+            return jsonify({
+                'status': 'success',
+                'message': f'Found {len(dates)} available dates',
+                'dates': dates
+            })
         except Exception as e:
             return jsonify({
                 'status': 'error',
