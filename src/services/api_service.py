@@ -82,6 +82,8 @@ class APIService:
         self.app.route('/api/charts/power-flow/<date>', methods=['GET'])(self.get_power_flow_chart_data)
         self.app.route('/api/charts/battery/<date>', methods=['GET'])(self.get_battery_chart_data)
         self.app.route('/api/charts/available-dates', methods=['GET'])(self.get_available_chart_dates)
+        # Generic metric chart route
+        self.app.route('/api/charts/metrics/<metric>/<date>', methods=['GET'])(self.get_sensor_metric_chart_data)
         
         # Feed history routes
         self.app.route('/api/feed-history/<date>', methods=['GET'])(self.get_feed_history)
@@ -720,6 +722,31 @@ class APIService:
             return jsonify({
                 'status': 'error',
                 'message': f'Error retrieving battery data: {str(e)}',
+                'data': []
+            }), 500
+
+    def get_sensor_metric_chart_data(self, metric, date):
+        """Get generic sensor metric chart data for a specific date"""
+        try:
+            result = self.chart_data_service.get_sensor_metric_data(metric, date)
+            if result['error']:
+                return jsonify({
+                    'status': 'error',
+                    'message': result['error'],
+                    'data': []
+                }), 404
+
+            return jsonify({
+                'status': 'success',
+                'message': f'Metric {metric} data retrieved for {date}',
+                'date': result['date'],
+                'total_records': result['total_records'],
+                'data': result['data']
+            })
+        except Exception as e:
+            return jsonify({
+                'status': 'error',
+                'message': f'Error retrieving metric data: {str(e)}',
                 'data': []
             }), 500
 

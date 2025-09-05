@@ -9,6 +9,8 @@ import json
 class ChartDataService:
     def __init__(self):
         self.data_dir = Path(__file__).parent.parent / 'data' / 'history' / 'sensors' / 'power-monitor'
+        # Base directory where SensorHistoryService stores per-sensor CSVs
+        self.sensors_history_base = Path(__file__).parent.parent / 'data' / 'history' / 'sensors'
         
     def get_power_flow_data(self, date_str):
         """
@@ -165,6 +167,150 @@ class ChartDataService:
                 'total_records': len(df)
             }
             
+        except Exception as e:
+            return {
+                'error': str(e),
+                'data': []
+            }
+
+    def get_sensor_metric_data(self, metric_key: str, date_str: str):
+        """
+        Get hourly-aggregated metric data for a given metric key and date.
+
+        Args:
+            metric_key: One of predefined metric keys
+            date_str: Date in format 'YYYY-MM-DD'
+
+        Returns:
+            Dict with date, data list [{ time: 'HH:00', value: number }], total_records
+        """
+        try:
+            # Map metric key to sensor dir and CSV column
+            metric_map = {
+                # Temperatures & humidity
+                'feederTemp': {
+                    'sensor_dir': 'dht22-feeder',
+                    'column': 'temperature_C',
+                    'label': 'Feeder Temp',
+                },
+                'systemTemp': {
+                    'sensor_dir': 'dht22-system',
+                    'column': 'temperature_C',
+                    'label': 'System Temp',
+                },
+                'systemHumi': {
+                    'sensor_dir': 'dht22-system',
+                    'column': 'humidity_%',
+                    'label': 'System Humidity',
+                },
+                # Food
+                'foodMoisture': {
+                    'sensor_dir': 'soil-moisture',
+                    'column': 'moisture_%',
+                    'label': 'Food Moisture',
+                },
+                'foodWeight': {
+                    'sensor_dir': 'hx711-feeder',
+                    'column': 'weight_kg',
+                    'label': 'Food Weight',
+                },
+                # Power monitor
+                'systemVoltage': {
+                    'sensor_dir': 'power-monitor',
+                    'column': 'loadVoltage_V',
+                    'label': 'System Voltage',
+                },
+                'systemCurrent': {
+                    'sensor_dir': 'power-monitor',
+                    'column': 'loadCurrent_A',
+                    'label': 'System Current',
+                },
+                'battery': {
+                    'sensor_dir': 'power-monitor',
+                    'column': 'batteryPercentage_%',
+                    'label': 'Battery',
+                },
+                'solarVoltage': {
+                    'sensor_dir': 'power-monitor',
+                    'column': 'solarVoltage_V',
+                    'label': 'Solar Voltage',
+                },
+                'solarCurrent': {
+                    'sensor_dir': 'power-monitor',
+                    'column': 'solarCurrent_A',
+                    'label': 'Solar Current',
+                },
+            }
+
+            if metric_key not in metric_map:
+                return {
+                    'error': f'Unsupported metric key: {metric_key}',
+                    'data': []
+                }
+
+            # Convert date format and build path
+            date_obj = datetime.strptime(date_str, '%Y-%m-%d')
+            date_filename = date_obj.strftime('%d-%m-%Y')
+            sensor_dir = self.sensors_history_base / metric_map[metric_key]['sensor_dir']
+            csv_filename = f"{metric_map[metric_key]['sensor_dir']}_{date_filename}.csv"
+            csv_path = sensor_dir / csv_filename
+
+            if not csv_path.exists():
+                return {
+                    'error': f'No data found for date {date_str}',
+                    'data': []
+                }
+
+            # Read CSV
+            df = pd.read_csv(csv_path)
+
+            # Require the column to exist
+            metric_column = metric_map[metric_key]['column']
+            if metric_column not in df.columns:
+                return {
+                    'error': f'Metric column not found: {metric_column}',
+                    'data': []
+                }
+
+            # Convert timestamp and aggregate hourly average
+            df['timestamp'] = pd.to_datetime(df['timestamp'])
+            df['hour'] = df['timestamp'].dt.hour
+            hourly_data = df.groupby('hour').agg({ metric_column: 'mean' }).reset_index()
+
+            # Limit hours if selected date is today
+            today = datetime.now().date()
+            selected_date = date_obj.date()
+            if selected_date == today:
+                max_hour = datetime.now().hour
+            else:
+                max_hour = 23
+
+            # Build result with continuous hours
+            result = []
+            for hour in range(max_hour + 1):
+                time_str = f"{hour:02d}:00"
+                hour_row = hourly_data[hourly_data['hour'] == hour]
+                if not hour_row.empty:
+                    value = round(float(hour_row.iloc[0][metric_column]), 3)
+                else:
+                    if result:
+                        value = result[-1]['value']
+                    else:
+                        # Default baseline when no prior value
+                        value = 0.0
+
+                result.append({
+                    'time': time_str,
+                    'value': value
+                })
+
+            return {
+                'error': None,
+                'data': result,
+                'date': date_str,
+                'total_records': len(df)
+            }
+
         except Exception as e:
             return {
                 'error': str(e),
