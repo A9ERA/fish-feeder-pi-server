@@ -2,15 +2,17 @@
 Feeder Service for controlling feeding process sequence
 """
 import time
+import datetime
 import threading
-from typing import Optional
+from typing import Optional, Dict, Any
 from pathlib import Path
 from .control_service import ControlService
 from .feeder_history_service import FeederHistoryService
 from .video_stream_service import VideoStreamService
+from .sensor_data_service import SensorDataService
 
 class FeederService:
-    def __init__(self, control_service: Optional[ControlService] = None, video_service: Optional[VideoStreamService] = None):
+    def __init__(self, control_service: Optional[ControlService] = None, video_service: Optional[VideoStreamService] = None, sensor_data_service: Optional[SensorDataService] = None):
         """
         Initialize Feeder Service
         
@@ -27,6 +29,51 @@ class FeederService:
             self.video_service = VideoStreamService()
         self._lock = threading.Lock()
         self.is_running = False
+        self.sensor_data_service = sensor_data_service
+
+    def _snapshot_sensor_values(self) -> Dict[str, Any]:
+        """Capture snapshot of relevant sensor values at the time of logging."""
+        result: Dict[str, Any] = {
+            'feeder_humi': None,
+            'food_moisture': None,
+            'food_weight_kg': None,
+            'battery_percentage': None,
+        }
+        try:
+            if not self.sensor_data_service:
+                return result
+            data = self.sensor_data_service.get_sensor_data()
+            sensors = data.get('sensors', {}) if isinstance(data, dict) else {}
+
+            def get_value(sensor_name: str, value_type: str) -> Optional[float]:
+                sensor = sensors.get(sensor_name, {})
+                values = sensor.get('values', [])
+                for v in values:
+                    if v.get('type') == value_type:
+                        try:
+                            return float(v.get('value'))
+                        except Exception:
+                            return None
+                return None
+
+            feeder_humi = get_value('DHT22_FEEDER', 'humidity')
+            food_moisture = get_value('SOIL_MOISTURE', 'moisture')
+            food_weight_kg = get_value('HX711_FEEDER', 'weight')
+            if food_weight_kg is not None:
+                try:
+                    food_weight_kg = abs(float(food_weight_kg))
+                except Exception:
+                    pass
+            battery_percentage = get_value('POWER_MONITOR', 'batteryPercentage')
+
+            result['feeder_humi'] = feeder_humi
+            result['food_moisture'] = food_moisture
+            result['food_weight_kg'] = food_weight_kg
+            result['battery_percentage'] = battery_percentage
+        except Exception:
+            # Keep defaults (None) on any error
+            pass
+        return result
 
     def start(self, feed_size: int, blower_duration: int) -> dict:
         """
@@ -55,10 +102,23 @@ class FeederService:
             self.is_running = True
 
         video_file = None
+        led_turned_on_for_night = False
         try:
             print(f"[Feeder Service] Starting feeding process...")
             print(f"Feed size: {feed_size}g, Blower duration: {blower_duration}s")
             print(f"Note: Using weight-based control - feeder motor open until {feed_size}g weight reduction")
+
+            # Night time LED control: 18:00 - 06:00 turn on LED during feeding
+            try:
+                now = datetime.datetime.now()
+                is_night_time = (now.hour >= 18 or now.hour < 6)
+                if is_night_time:
+                    if self.control_service:
+                        self.control_service.relay_led_on()
+                        led_turned_on_for_night = True
+                        print("[Feeder Service] Night time detected (18:00-06:00). LED turned ON for feeding.")
+            except Exception as led_err:
+                print(f"[Feeder Service] Warning: Failed to control LED for night feeding: {led_err}")
 
             # Start video recording
             try:
@@ -102,6 +162,7 @@ class FeederService:
             # Log successful feed operation
             # Extract only filename from full path for CSV storage
             video_filename = Path(video_file).name if video_file else ""
+            snapshot = self._snapshot_sensor_values()
             self.history_service.log_feed_operation(
                 feed_size=feed_size,
                 feedermotor_open=estimated_feedermotor_open,  # Estimated time
@@ -109,7 +170,11 @@ class FeederService:
                 blower_duration=blower_duration,
                 status='success',
                 message='Feeding process completed successfully (Arduino controlled)',
-                video_file=video_filename
+                video_file=video_filename,
+                feeder_humi=snapshot.get('feeder_humi'),
+                food_moisture=snapshot.get('food_moisture'),
+                food_weight_kg=snapshot.get('food_weight_kg'),
+                battery_percentage=snapshot.get('battery_percentage'),
             )
             
             return {
@@ -148,6 +213,7 @@ class FeederService:
             # Log failed feed operation (use fixed feeder motor values for logging)
             # Extract only filename from full path for CSV storage
             video_filename = Path(video_file).name if video_file else ""
+            snapshot = self._snapshot_sensor_values()
             self.history_service.log_feed_operation(
                 feed_size=feed_size,
                 feedermotor_open=5,  # Fixed value
@@ -155,7 +221,11 @@ class FeederService:
                 blower_duration=blower_duration,
                 status='error',
                 message=error_msg,
-                video_file=video_filename
+                video_file=video_filename,
+                feeder_humi=snapshot.get('feeder_humi'),
+                food_moisture=snapshot.get('food_moisture'),
+                food_weight_kg=snapshot.get('food_weight_kg'),
+                battery_percentage=snapshot.get('battery_percentage'),
             )
 
             return {
@@ -165,6 +235,14 @@ class FeederService:
             }
         
         finally:
+            # Ensure LED is OFF after each feeding when we turned it on for night time
+            try:
+                if led_turned_on_for_night and self.control_service:
+                    self.control_service.relay_led_off()
+                    print("[Feeder Service] LED turned OFF after feeding (night mode).")
+            except Exception as led_err:
+                print(f"[Feeder Service] Warning: Failed to turn OFF LED after feeding: {led_err}")
+
             self.is_running = False
 
     def stop_all(self) -> dict:
@@ -185,6 +263,11 @@ class FeederService:
             
             # Send emergency stop command to Arduino
             self.control_service._send_command("feeder:stop")
+            # Ensure LED is OFF on emergency stop
+            try:
+                self.control_service.relay_led_off()
+            except Exception as led_err:
+                print(f"[Feeder Service] Warning: Failed to turn OFF LED on emergency stop: {led_err}")
             
             self.is_running = False
             

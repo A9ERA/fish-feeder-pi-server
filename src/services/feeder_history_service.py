@@ -4,7 +4,7 @@ Service for managing feeder operation history storage to CSV files
 import csv
 import datetime
 import os
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from pathlib import Path
 
 class FeederHistoryService:
@@ -33,7 +33,12 @@ class FeederHistoryService:
                 'blower_duration_s': feed_data['blower_duration'],
                 'status': feed_data['status'],
                 'message': feed_data.get('message', ''),
-                'video_file': feed_data.get('video_file', '')
+                'video_file': feed_data.get('video_file', ''),
+                # New optional sensor snapshot fields
+                'feeder_humi_%': '' if feed_data.get('feeder_humi') is None else float(feed_data.get('feeder_humi')), 
+                'food_moisture_%': '' if feed_data.get('food_moisture') is None else float(feed_data.get('food_moisture')),
+                'food_weight_kg': '' if feed_data.get('food_weight_kg') is None else float(feed_data.get('food_weight_kg')),
+                'battery_percentage_%': '' if feed_data.get('battery_percentage') is None else float(feed_data.get('battery_percentage')),
             }
             
             # Write to CSV with proper line endings
@@ -49,7 +54,7 @@ class FeederHistoryService:
                                 fix_file.write('\n')
                 except Exception as e:
                     print(f"[⚠️][Feeder History] Could not fix line ending: {e}")
-            
+
             with open(csv_path, 'a', newline='', encoding='utf-8') as csvfile:
                 fieldnames = list(row_data.keys())
                 writer = csv.DictWriter(csvfile, fieldnames=fieldnames, lineterminator='\n')
@@ -68,7 +73,9 @@ class FeederHistoryService:
             print(f"[❌][Feeder History] Error writing CSV data: {e}")
     
     def log_feed_operation(self, feed_size: int, feedermotor_open: float, feedermotor_close: float, 
-                         blower_duration: float, status: str, message: str = "", video_file: str = ""):
+                         blower_duration: float, status: str, message: str = "", video_file: str = "",
+                         feeder_humi: Optional[float] = None, food_moisture: Optional[float] = None,
+                         food_weight_kg: Optional[float] = None, battery_percentage: Optional[float] = None):
         """Log a feed operation to CSV file"""
         try:
             current_time = datetime.datetime.now()
@@ -92,7 +99,12 @@ class FeederHistoryService:
                 'blower_duration': blower_duration,
                 'status': status,
                 'message': message,
-                'video_file': video_file
+                'video_file': video_file,
+                # Attach optional sensor snapshot data
+                'feeder_humi': feeder_humi,
+                'food_moisture': food_moisture,
+                'food_weight_kg': food_weight_kg,
+                'battery_percentage': battery_percentage,
             }
             
             # Write data to CSV
@@ -141,8 +153,34 @@ class FeederHistoryService:
                             'blower_duration': float(row['blower_duration_s']),
                             'status': row['status'],
                             'message': row.get('message', ''),
-                            'video_file': row.get('video_file', '')
+                            'video_file': row.get('video_file', ''),
+                            # Optional sensor snapshot fields (may be missing in older rows)
+                            'feeder_humi': None,
+                            'food_moisture': None,
+                            'food_weight_kg': None,
+                            'battery_percentage': None,
                         }
+                        # Parse optional fields if present
+                        try:
+                            if 'feeder_humi_%' in row and row['feeder_humi_%'] != '':
+                                feed_log['feeder_humi'] = float(row['feeder_humi_%'])
+                        except Exception:
+                            pass
+                        try:
+                            if 'food_moisture_%' in row and row['food_moisture_%'] != '':
+                                feed_log['food_moisture'] = float(row['food_moisture_%'])
+                        except Exception:
+                            pass
+                        try:
+                            if 'food_weight_kg' in row and row['food_weight_kg'] != '':
+                                feed_log['food_weight_kg'] = float(row['food_weight_kg'])
+                        except Exception:
+                            pass
+                        try:
+                            if 'battery_percentage_%' in row and row['battery_percentage_%'] != '':
+                                feed_log['battery_percentage'] = float(row['battery_percentage_%'])
+                        except Exception:
+                            pass
                         feed_logs.append(feed_log)
                     except (ValueError, KeyError) as e:
                         print(f"[⚠️][Feeder History] Error parsing row: {e}")

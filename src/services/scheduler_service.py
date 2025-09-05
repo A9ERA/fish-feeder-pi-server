@@ -402,6 +402,10 @@ class SchedulerService:
                 prev_level = prev.get('level') if isinstance(prev, dict) else 'normal'
                 alert_id = prev.get('alert_id') if isinstance(prev, dict) else None
 
+                # Detect re-trigger: previously normal (last evaluated), now goes back to alert
+                last_eval_level = self._last_alert_state.get(sensor_key, 'normal')
+                is_retrigger = (level != 'normal' and last_eval_level == 'normal')
+
                 # Transition logic
                 if level == 'normal':
                     # Resolve: remove active entry, keep log
@@ -420,10 +424,15 @@ class SchedulerService:
                     # Clear active
                     if sensor_key in active_state:
                         active_state.pop(sensor_key, None)
+                    # Clear acknowledged state for this sensor to avoid stale ack affecting future alerts
+                    if sensor_key in ack_state:
+                        ack_state.pop(sensor_key, None)
+                    # Update last evaluated level
+                    self._last_alert_state[sensor_key] = 'normal'
                 else:
                     # Create or update active
                     new_level = level
-                    if prev and alert_id:
+                    if prev and alert_id and not is_retrigger:
                         # existing alert
                         if prev_level != new_level:
                             # Escalate from warning -> critical
@@ -453,9 +462,10 @@ class SchedulerService:
                         # If escalated to critical, mark any pending warning acknowledgement as irrelevant by setting acknowledged true
                         if new_level == 'critical':
                             ack_state[sensor_key] = {'alert_id': alert_id, 'acknowledged': True, 'level': 'critical', 'timestamp': now_iso}
+                        # Update last evaluated level
+                        self._last_alert_state[sensor_key] = new_level
                     else:
-                        # create new alert entry and log
-                        # generate alert id by pushing a log first
+                        # New alert or re-trigger after normal: always generate new alert_id and reset acknowledged
                         tmp_id = self._write_alert_log({
                             'sensorKey': sensor_key,
                             'level': level,
@@ -475,6 +485,8 @@ class SchedulerService:
                             'timestamp_first_seen': now_iso,
                             'last_updated': now_iso
                         }
+                        # Update last evaluated level
+                        self._last_alert_state[sensor_key] = new_level
 
             process('dht22_feeder_humidity', feeder_humi)
             process('soil_moisture', soil_moist)
