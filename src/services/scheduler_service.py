@@ -559,10 +559,11 @@ class SchedulerService:
 
             # Thresholds
             threshold_kg = 1.0
-            min_interval_sec = 60  # avoid duplicate logs within short period
+            # min_interval_sec = 60  # avoid duplicate logs within short period
 
             now_ts = time.time()
-            if increase >= threshold_kg and (now_ts - self._last_refill_log_time) >= min_interval_sec:
+            # if increase >= threshold_kg and (now_ts - self._last_refill_log_time) >= min_interval_sec:
+            if increase >= threshold_kg:
                 try:
                     self.refill_history_service.log_refill(weight_before_kg=previous_weight, weight_after_kg=current_weight)
                     self._last_refill_log_time = now_ts
