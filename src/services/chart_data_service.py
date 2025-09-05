@@ -206,7 +206,7 @@ class ChartDataService:
                 # Food
                 'foodMoisture': {
                     'sensor_dir': 'soil-moisture',
-                    'column': 'moisture_%',
+                    'column': 'soil_moisture_%',
                     'label': 'Food Moisture',
                 },
                 'foodWeight': {
