@@ -47,10 +47,10 @@ def open_web_ui(url):
         print(f"⚠️ webbrowser failed: {e}")
 
     try:
-        if shutil.which('xdg-open'):
-            subprocess.Popen(['xdg-open', url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            print("✅ Web UI opened via xdg-open")
-            return True
+        # if shutil.which('xdg-open'):
+        #     subprocess.Popen(['xdg-open', url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        #     print("✅ Web UI opened via xdg-open")
+        #     return True
 
         for browser in ['chromium-browser', 'chromium', 'google-chrome']:
             path = shutil.which(browser)
