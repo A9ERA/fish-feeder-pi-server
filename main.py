@@ -7,10 +7,7 @@ import os
 from pathlib import Path
 import time
 import threading
-import webbrowser
-import subprocess
-import shutil
-import socket
+ 
 
 # Add src to path
 sys.path.append(str(Path(__file__).parent / 'src'))
@@ -20,56 +17,7 @@ from src.services.firebase_service import FirebaseService
 from src.services.serial_service import SerialService
 from src.config.settings import PORT
 
-def wait_for_port(host, port, timeout=30):
-    """Wait until a TCP port is open or timeout occurs."""
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        try:
-            with socket.create_connection((host, port), timeout=1):
-                return True
-        except Exception:
-            time.sleep(0.5)
-    return False
-
-def open_web_ui(url):
-    """Open URL using a GUI browser on Raspberry Pi.
-
-    Priority:
-    1) chromium-browser/chromium/google-chrome
-    2) xdg-open
-    3) Python webbrowser (fallback, may be text-mode)
-    """
-    print(f"🌐 Opening Web UI: {url}")
-
-    # 1) Try Chromium-family browsers directly to ensure GUI
-    try:
-        for browser in ['chromium-browser', 'chromium', 'google-chrome']:
-            path = shutil.which(browser)
-            if path:
-                subprocess.Popen([path, url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                print(f"✅ Web UI opened via {browser}")
-                return True
-    except Exception as e:
-        print(f"⚠️ Chromium open failed: {e}")
-
-    # 2) Try xdg-open if available
-    try:
-        if shutil.which('xdg-open'):
-            subprocess.Popen(['xdg-open', url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            print("✅ Web UI opened via xdg-open")
-            return True
-    except Exception as e:
-        print(f"⚠️ xdg-open failed: {e}")
-
-    # 3) Fallback to Python webbrowser
-    try:
-        if webbrowser.open(url, new=2):
-            print("✅ Web UI open command sent via webbrowser")
-            return True
-    except Exception as e:
-        print(f"❌ webbrowser failed: {e}")
-
-    return False
+ 
 
 def main():
     """Main function to start the server"""
@@ -122,13 +70,7 @@ def main():
         # Give the API server time to start
         time.sleep(2)
 
-        # Attempt to open remote Web UI once API port is ready
-        url_to_open = 'https://fish-feeder-test-1.web.app/'
-        if wait_for_port('127.0.0.1', api_service.port, timeout=15):
-            open_web_ui(url_to_open)
-        else:
-            print("⚠️ API port not ready within timeout; attempting to open Web UI anyway")
-            open_web_ui(url_to_open)
+
         
         # Main monitoring loop
         print("🔍 Starting connection monitoring...")
