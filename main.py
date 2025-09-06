@@ -32,26 +32,17 @@ def wait_for_port(host, port, timeout=30):
     return False
 
 def open_web_ui(url):
-    """Attempt to open the given URL on the device's default browser.
+    """Open URL using a GUI browser on Raspberry Pi.
 
-    Falls back to xdg-open or chromium if needed. This is best-effort and
-    safe to call when running under a graphical session. If running headless
-    as a system service without a GUI, this may do nothing.
+    Priority:
+    1) chromium-browser/chromium/google-chrome
+    2) xdg-open
+    3) Python webbrowser (fallback, may be text-mode)
     """
-    try:
-        print(f"🌐 Opening Web UI: {url}")
-        if webbrowser.open(url, new=2):
-            print("✅ Web UI open command sent")
-            return True
-    except Exception as e:
-        print(f"⚠️ webbrowser failed: {e}")
+    print(f"🌐 Opening Web UI: {url}")
 
+    # 1) Try Chromium-family browsers directly to ensure GUI
     try:
-        # if shutil.which('xdg-open'):
-        #     subprocess.Popen(['xdg-open', url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        #     print("✅ Web UI opened via xdg-open")
-        #     return True
-
         for browser in ['chromium-browser', 'chromium', 'google-chrome']:
             path = shutil.which(browser)
             if path:
@@ -59,7 +50,24 @@ def open_web_ui(url):
                 print(f"✅ Web UI opened via {browser}")
                 return True
     except Exception as e:
-        print(f"❌ Failed to open Web UI: {e}")
+        print(f"⚠️ Chromium open failed: {e}")
+
+    # 2) Try xdg-open if available
+    try:
+        if shutil.which('xdg-open'):
+            subprocess.Popen(['xdg-open', url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            print("✅ Web UI opened via xdg-open")
+            return True
+    except Exception as e:
+        print(f"⚠️ xdg-open failed: {e}")
+
+    # 3) Fallback to Python webbrowser
+    try:
+        if webbrowser.open(url, new=2):
+            print("✅ Web UI open command sent via webbrowser")
+            return True
+    except Exception as e:
+        print(f"❌ webbrowser failed: {e}")
 
     return False
 
