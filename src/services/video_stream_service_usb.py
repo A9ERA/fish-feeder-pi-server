@@ -40,10 +40,10 @@ class VideoStreamService:
         except Exception:
             self.device_index = None
 
-        self.frame_width = int(os.getenv('CAMERA_WIDTH', '1280'))
-        self.frame_height = int(os.getenv('CAMERA_HEIGHT', '720'))
+        self.frame_width = int(os.getenv('CAMERA_WIDTH', '500'))
+        self.frame_height = int(os.getenv('CAMERA_HEIGHT', '500'))
         self.target_fps = int(os.getenv('CAMERA_FPS', '30'))
-        self.jpeg_quality = int(os.getenv('CAMERA_JPEG_QUALITY', '80'))
+        self.jpeg_quality = int(os.getenv('CAMERA_JPEG_QUALITY', '60'))
 
         # Runtime state
         self.capture = None
