@@ -6,7 +6,7 @@ from flask import Flask, jsonify, Response, render_template, request
 from flask_cors import CORS
 from pathlib import Path
 import time
-from .video_stream_service import VideoStreamService
+from .video_stream_service_usb import VideoStreamService
 from .control_service import ControlService
 from .firebase_service import FirebaseService
 from .sensor_data_service import SensorDataService

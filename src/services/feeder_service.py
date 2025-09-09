@@ -8,7 +8,7 @@ from typing import Optional, Dict, Any
 from pathlib import Path
 from .control_service import ControlService
 from .feeder_history_service import FeederHistoryService
-from .video_stream_service import VideoStreamService
+from .video_stream_service_usb import VideoStreamService
 from .sensor_data_service import SensorDataService
 
 class FeederService:

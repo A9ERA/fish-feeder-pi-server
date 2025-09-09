@@ -5,7 +5,6 @@ json5==0.9.14
 numpy==1.26.4
 pandas==2.2.1
 opencv-python==4.8.1.78
-picamera2==0.3.27
 pyserial==3.5
 python-dotenv>=0.19.0
 firebase-admin>=6.0.0
