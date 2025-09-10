@@ -95,6 +95,7 @@ class APIService:
         
         # Video serving routes
         self.app.route('/api/feed-video/<filename>', methods=['GET'])(self.serve_feed_video)
+        self.app.route('/api/feed-video/<filename>/stream', methods=['GET'])(self.stream_feed_video)
 
     def index(self):
         """Render the main video streaming page"""
@@ -873,11 +874,13 @@ class APIService:
             }), 500
 
     def serve_feed_video(self, filename):
-        """Serve feed video file"""
+        """Serve feed video file with correct mimetype and Accept-Ranges support"""
         try:
             from flask import send_file, abort
             import os
             from pathlib import Path
+            import mimetypes
+            from flask import make_response, request
             
             # Define video directory path
             video_dir = Path(__file__).parent.parent / 'data' / 'history' / 'feeder-vdo'
@@ -896,18 +899,67 @@ class APIService:
             if video_path.suffix.lower() not in allowed_extensions:
                 abort(400, description="Invalid file type")
             
-            # Return video file
-            return send_file(
-                str(video_path),
-                mimetype='video/mp4',
-                as_attachment=False,
-                download_name=filename
-            )
+            guessed = mimetypes.guess_type(str(video_path))[0] or 'application/octet-stream'
+            resp = make_response(send_file(str(video_path), mimetype=guessed, as_attachment=False, download_name=filename))
+            # Advise browser we support range requests (Flask will handle ranges automatically in send_file >=2.0)
+            resp.headers['Accept-Ranges'] = 'bytes'
+            return resp
             
         except Exception as e:
             return jsonify({
                 'status': 'error',
                 'message': f'Error serving video file: {str(e)}'
+            }), 500
+
+    def stream_feed_video(self, filename):
+        """Stream feed video with manual Range support for older clients."""
+        try:
+            from flask import request, abort, Response
+            import os
+            from pathlib import Path
+            import mimetypes
+
+            video_dir = Path(__file__).parent.parent / 'data' / 'history' / 'feeder-vdo'
+            video_path = video_dir / filename
+            if not video_path.exists():
+                abort(404, description="Video file not found")
+
+            file_size = os.path.getsize(video_path)
+            range_header = request.headers.get('Range', None)
+            content_type = mimetypes.guess_type(str(video_path))[0] or 'video/mp4'
+
+            if range_header:
+                # Parse Range header: bytes=start-end
+                bytes_unit, bytes_range = range_header.split('=')
+                if bytes_unit != 'bytes':
+                    abort(416)
+                start_str, end_str = bytes_range.split('-')
+                start = int(start_str) if start_str else 0
+                end = int(end_str) if end_str else file_size - 1
+                end = min(end, file_size - 1)
+                if start > end or start >= file_size:
+                    abort(416)
+
+                length = end - start + 1
+                with open(video_path, 'rb') as f:
+                    f.seek(start)
+                    data = f.read(length)
+                rv = Response(data, 206, mimetype=content_type, direct_passthrough=True)
+                rv.headers.add('Content-Range', f'bytes {start}-{end}/{file_size}')
+                rv.headers.add('Accept-Ranges', 'bytes')
+                rv.headers.add('Content-Length', str(length))
+                return rv
+            else:
+                with open(video_path, 'rb') as f:
+                    data = f.read()
+                rv = Response(data, 200, mimetype=content_type, direct_passthrough=True)
+                rv.headers.add('Content-Length', str(file_size))
+                rv.headers.add('Accept-Ranges', 'bytes')
+                return rv
+        except Exception as e:
+            return jsonify({
+                'status': 'error',
+                'message': f'Error streaming video file: {str(e)}'
             }), 500
 
     def control_sensor(self):

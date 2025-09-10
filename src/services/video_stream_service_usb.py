@@ -11,6 +11,7 @@ from threading import Condition, Thread
 import time
 from pathlib import Path
 import uuid
+import shutil
 
 
 class VideoStreamService:
@@ -55,10 +56,12 @@ class VideoStreamService:
         # Recording state (general recording)
         self.record_writer = None
         self.record_file_path = None
+        self.ffmpeg_proc = None
 
         # Recording state (feeder recording)
         self.feeder_writer = None
         self.current_feeder_recording = None
+        self.ffmpeg_feeder_proc = None
 
         # Initialize camera
         self.mock_mode = False
@@ -286,7 +289,19 @@ class VideoStreamService:
         if not fps or fps <= 1:
             fps = float(self.target_fps)
 
-        # Try MP4V -> fallback to XVID/AVI
+        # Prefer H264 via OpenCV if available (rare on pip wheels), else MP4V, else XVID/AVI
+        try:
+            fourcc_h264 = cv2.VideoWriter_fourcc(*'H264')
+            writer = cv2.VideoWriter(str(filepath), fourcc_h264, fps, (width, height))
+            if writer is not None and writer.isOpened():
+                return writer, filepath
+            try:
+                writer.release()
+            except Exception:
+                pass
+        except Exception:
+            pass
+
         fourcc_mp4v = cv2.VideoWriter_fourcc(*'mp4v')
         writer = cv2.VideoWriter(str(filepath), fourcc_mp4v, fps, (width, height))
         if writer is not None and writer.isOpened():
@@ -297,6 +312,69 @@ class VideoStreamService:
         fourcc_xvid = cv2.VideoWriter_fourcc(*'XVID')
         writer = cv2.VideoWriter(str(fallback_path), fourcc_xvid, fps, (width, height))
         return writer, fallback_path
+
+    def _start_ffmpeg_record(self, output_file: Path):
+        """Try to start ffmpeg to record H.264 + faststart. Returns subprocess.Popen or None."""
+        ffmpeg_bin = os.getenv('FFMPEG_BIN', 'ffmpeg')
+        if shutil.which(ffmpeg_bin) is None:
+            return None
+
+        width = int(self.capture.get(cv2.CAP_PROP_FRAME_WIDTH)) if self.capture else self.frame_width
+        height = int(self.capture.get(cv2.CAP_PROP_FRAME_HEIGHT)) if self.capture else self.frame_height
+        fps = int(self.capture.get(cv2.CAP_PROP_FPS)) if self.capture else int(self.target_fps)
+        if not fps or fps <= 1:
+            fps = int(self.target_fps)
+
+        encoders = [
+            ['-c:v', 'h264_v4l2m2m'],
+            ['-c:v', 'libx264', '-preset', 'veryfast']
+        ]
+
+        common = [
+            ffmpeg_bin, '-hide_banner', '-loglevel', 'warning',
+            '-f', 'v4l2', '-input_format', 'mjpeg',
+            '-framerate', str(fps), '-video_size', f'{width}x{height}',
+            '-i', str(self.device_path),
+            '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-an', '-y', str(output_file)
+        ]
+
+        for enc in encoders:
+            cmd = common.copy()
+            # insert encoder right before '-pix_fmt'
+            insert_idx = cmd.index('-pix_fmt') if '-pix_fmt' in cmd else len(cmd)
+            cmd = cmd[:insert_idx] + enc + cmd[insert_idx:]
+            try:
+                proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                time.sleep(0.3)
+                if proc.poll() is None:
+                    return proc
+            except Exception:
+                pass
+        return None
+
+    def _ffmpeg_faststart_copy(self, input_path: Path) -> Path | None:
+        """If ffmpeg is available, remux file with -movflags +faststart (moov at head)."""
+        ffmpeg_bin = os.getenv('FFMPEG_BIN', 'ffmpeg')
+        if shutil.which(ffmpeg_bin) is None:
+            return None
+        try:
+            temp_out = input_path.with_suffix('.tmp.mp4')
+            cmd = [
+                ffmpeg_bin, '-hide_banner', '-loglevel', 'warning', '-y',
+                '-i', str(input_path), '-c', 'copy', '-movflags', '+faststart', str(temp_out)
+            ]
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+            if result.returncode == 0 and temp_out.exists() and temp_out.stat().st_size > 0:
+                # Replace original file
+                try:
+                    input_path.unlink(missing_ok=True)
+                except Exception:
+                    pass
+                temp_out.rename(input_path)
+                return input_path
+        except Exception:
+            return None
+        return None
 
     def start_recording(self):
         """Start general video recording"""
@@ -310,19 +388,44 @@ class VideoStreamService:
             self.record_file_path = str(output_file)
             return str(output_file)
 
-        # Create writer
+        # Prefer ffmpeg (H.264 faststart); fallback to OpenCV writer
+        self.ffmpeg_proc = self._start_ffmpeg_record(output_file)
+        if self.ffmpeg_proc is not None:
+            self.record_file_path = str(output_file)
+            print(f"🎬 Recording started via ffmpeg: {output_file}")
+            return self.record_file_path
+
         writer, actual_path = self._create_video_writer(output_file)
         if writer is None or not writer.isOpened():
             raise RuntimeError("Failed to start video writer")
         self.record_writer = writer
         self.record_file_path = str(actual_path)
-        print(f"🎬 Recording started: {actual_path}")
+        print(f"🎬 Recording started via OpenCV: {actual_path}")
         return self.record_file_path
 
     def stop_recording(self):
         """Stop general video recording"""
         if self.mock_mode:
             print("🛑 Mock recording stopped")
+            return
+        if self.ffmpeg_proc is not None:
+            try:
+                # Ask ffmpeg to stop gracefully to finalize moov atom
+                if self.ffmpeg_proc.stdin:
+                    try:
+                        self.ffmpeg_proc.stdin.write(b'q')
+                        self.ffmpeg_proc.stdin.flush()
+                    except Exception:
+                        pass
+                self.ffmpeg_proc.wait(timeout=5)
+            except Exception:
+                try:
+                    self.ffmpeg_proc.terminate()
+                except Exception:
+                    pass
+            finally:
+                self.ffmpeg_proc = None
+            print("🛑 Recording stopped (ffmpeg)")
             return
         if self.record_writer is not None:
             try:
@@ -331,6 +434,12 @@ class VideoStreamService:
                 pass
             self.record_writer = None
             print("🛑 Recording stopped")
+            # Post-process to faststart if possible
+            try:
+                if self.record_file_path:
+                    self._ffmpeg_faststart_copy(Path(self.record_file_path))
+            except Exception:
+                pass
 
     def record_audio(self, duration=30):
         """Record audio using arecord (Linux) or mock on macOS"""
@@ -362,12 +471,19 @@ class VideoStreamService:
             self.current_feeder_recording = str(output_file)
             return str(output_file)
 
+        # Prefer ffmpeg (H.264 faststart); fallback to OpenCV writer
+        self.ffmpeg_feeder_proc = self._start_ffmpeg_record(output_file)
+        if self.ffmpeg_feeder_proc is not None:
+            self.current_feeder_recording = str(output_file)
+            print(f"🎬 Feeder recording started via ffmpeg: {output_file}")
+            return self.current_feeder_recording
+
         writer, actual_path = self._create_video_writer(output_file)
         if writer is None or not writer.isOpened():
             raise RuntimeError("Failed to start feeder video writer")
         self.feeder_writer = writer
         self.current_feeder_recording = str(actual_path)
-        print(f"🎬 Feeder recording started: {actual_path}")
+        print(f"🎬 Feeder recording started via OpenCV: {actual_path}")
         return self.current_feeder_recording
 
     def stop_feeder_recording(self):
@@ -375,7 +491,27 @@ class VideoStreamService:
         if self.mock_mode:
             print("🛑 Mock feeder recording stopped")
             return getattr(self, 'current_feeder_recording', None)
-
+        if self.ffmpeg_feeder_proc is not None:
+            try:
+                if self.ffmpeg_feeder_proc.stdin:
+                    try:
+                        self.ffmpeg_feeder_proc.stdin.write(b'q')
+                        self.ffmpeg_feeder_proc.stdin.flush()
+                    except Exception:
+                        pass
+                self.ffmpeg_feeder_proc.wait(timeout=5)
+            except Exception:
+                try:
+                    self.ffmpeg_feeder_proc.terminate()
+                except Exception:
+                    pass
+            finally:
+                self.ffmpeg_feeder_proc = None
+            print("🛑 Feeder recording stopped (ffmpeg)")
+            recording_file = getattr(self, 'current_feeder_recording', None)
+            if hasattr(self, 'current_feeder_recording'):
+                delattr(self, 'current_feeder_recording')
+            return recording_file
         if self.feeder_writer is not None:
             try:
                 self.feeder_writer.release()
@@ -383,6 +519,13 @@ class VideoStreamService:
                 pass
             self.feeder_writer = None
             print("🛑 Feeder recording stopped")
+            # Post-process to faststart if possible
+            try:
+                recording_path = getattr(self, 'current_feeder_recording', None)
+                if recording_path:
+                    self._ffmpeg_faststart_copy(Path(recording_path))
+            except Exception:
+                pass
 
         recording_file = getattr(self, 'current_feeder_recording', None)
         if hasattr(self, 'current_feeder_recording'):
@@ -415,6 +558,20 @@ class VideoStreamService:
             if self.feeder_writer is not None:
                 self.feeder_writer.release()
                 self.feeder_writer = None
+        except Exception:
+            pass
+
+        try:
+            if self.ffmpeg_proc is not None:
+                self.ffmpeg_proc.terminate()
+                self.ffmpeg_proc = None
+        except Exception:
+            pass
+
+        try:
+            if self.ffmpeg_feeder_proc is not None:
+                self.ffmpeg_feeder_proc.terminate()
+                self.ffmpeg_feeder_proc = None
         except Exception:
             pass
 
