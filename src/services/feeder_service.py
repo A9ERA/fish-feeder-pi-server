@@ -127,8 +127,20 @@ class FeederService:
             except Exception as video_error:
                 print(f"[Feeder Service] Warning: Failed to start video recording: {video_error}")
 
-            # Send feeder start command to Arduino with parameters (feed_size and blower_duration)
-            feeder_params = f"{feed_size},{blower_duration}"
+            # Try fetch weight tolerance from Firebase app_setting and include as optional param
+            weight_tolerance = 5  # Default to 5g if Firebase not available
+            try:
+                from firebase_admin import db  # Lazy import to avoid hard dependency when not configured
+                ref = db.reference('/app_setting/feeder/weight_tolerance')
+                wt = ref.get()
+                if wt is not None:
+                    weight_tolerance = int(float(wt))
+            except Exception:
+                # Ignore firebase errors silently; keep default
+                pass
+
+            # Send feeder start command to Arduino with parameters (feed_size, blower_duration, weight_tolerance)
+            feeder_params = f"{feed_size},{blower_duration},{weight_tolerance}"
             command = f"feeder:start:{feeder_params}"
             
             print(f"[Feeder Service] Sending command to Arduino: [control]:{command}")
